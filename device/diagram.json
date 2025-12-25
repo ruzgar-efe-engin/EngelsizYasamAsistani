@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "author": "Türenç Engin",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-xiao-esp32-s3", "id": "ESP", "top": 77.37, "left": -101.42, "attrs": {} },
+    { "type": "wokwi-ky-040", "id": "Theme", "top": -103.9, "left": -423.2, "attrs": {} },
+    { "type": "wokwi-ky-040", "id": "MainMenu", "top": 145.7, "left": -432.8, "attrs": {} },
+    { "type": "wokwi-ky-040", "id": "SubMenu", "top": 241.7, "left": -308, "attrs": {} },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "AI",
+      "top": -41.8,
+      "left": -201.6,
+      "attrs": { "color": "black", "xray": "1" }
+    },
+    {
+      "type": "wokwi-pushbutton-6mm",
+      "id": "Yes",
+      "top": 26.6,
+      "left": -240,
+      "attrs": { "color": "green", "xray": "1" }
+    },
+    {
+      "type": "wokwi-pushbutton-6mm",
+      "id": "No",
+      "top": 26.6,
+      "left": -134.4,
+      "attrs": { "color": "green", "xray": "1" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "Vibration",
+      "top": 25.2,
+      "left": 109.4,
+      "attrs": { "color": "red" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r1",
+      "top": 119.15,
+      "left": 67.2,
+      "attrs": { "value": "1000" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r2",
+      "top": -111.25,
+      "left": -259.2,
+      "attrs": { "value": "10000" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r3",
+      "top": -92.05,
+      "left": -259.2,
+      "attrs": { "value": "10000" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r4",
+      "top": 234.35,
+      "left": -134.4,
+      "attrs": { "value": "10000" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r5",
+      "top": 157.55,
+      "left": -278.4,
+      "attrs": { "value": "10000" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r6",
+      "top": 253.55,
+      "left": -134.4,
+      "attrs": { "value": "10000" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r7",
+      "top": 138.35,
+      "left": -278.4,
+      "attrs": { "value": "10000" }
+    }
+  ],
+  "connections": [
+    [ "r2:1", "Theme:CLK", "red", [ "h-9.6", "v28.8" ] ],
+    [ "Theme:DT", "r3:1", "red", [ "h38.4", "v-9.5" ] ],
+    [ "Theme:GND", "ESP:GND", "black", [ "h297.6", "v164" ] ],
+    [ "r3:2", "ESP:3V3", "red", [ "h210", "v201.6" ] ],
+    [ "Theme:CLK", "ESP:D0", "green", [ "h19.2", "v192" ] ],
+    [ "Theme:DT", "ESP:D1", "blue", [ "h9.6", "v192.1" ] ],
+    [ "SubMenu:CLK", "r4:1", "red", [ "h9.6", "v-19.2" ] ],
+    [ "SubMenu:DT", "r6:1", "red", [ "h0" ] ],
+    [ "MainMenu:CLK", "r7:1", "red", [ "h28.8", "v-19.2" ] ],
+    [ "MainMenu:DT", "r5:1", "red", [ "h0" ] ],
+    [ "r6:2", "ESP:3V3", "red", [ "h75.6", "v-144" ] ],
+    [ "r5:2", "r7:2", "red", [ "h8.4", "v-28.8" ] ],
+    [ "r5:2", "ESP:3V3", "red", [ "h18", "v9.6", "h211.2", "v-57.6" ] ],
+    [ "r3:2", "r2:2", "red", [ "h8.4", "v-28.8" ] ],
+    [ "Theme:VCC", "r3:2", "red", [ "h115.2", "v-18.8" ] ],
+    [ "MainMenu:VCC", "r5:2", "red", [ "h105.6", "v-18.8" ] ],
+    [ "MainMenu:GND", "ESP:GND", "black", [ "h307.2", "v-85.6" ] ],
+    [ "r4:2", "r6:2", "red", [ "h8.4", "v28.8" ] ],
+    [ "SubMenu:VCC", "r6:2", "red", [ "h86.4", "v0.4", "h38.4", "v-19.2" ] ],
+    [ "SubMenu:GND", "ESP:GND", "black", [ "h172.8", "v-181.6" ] ],
+    [ "ESP:D2", "MainMenu:CLK", "green", [ "h-211.2", "v38.4" ] ],
+    [ "ESP:D3", "MainMenu:DT", "blue", [ "h-201.6", "v38.3" ] ],
+    [ "ESP:D4", "SubMenu:CLK", "green", [ "h-48", "v115.2" ] ],
+    [ "ESP:D5", "SubMenu:DT", "blue", [ "h-57.6", "v115.1" ] ],
+    [ "ESP:D6", "SubMenu:SW", "purple", [ "h-67.2", "v115.2", "h-28.8" ] ],
+    [ "Vibration:C", "ESP:GND", "black", [ "v0" ] ],
+    [ "r1:2", "Vibration:A", "green", [ "h8.4", "v-57.6" ] ],
+    [ "r1:1", "ESP:D10", "green", [ "v0" ] ],
+    [ "No:1.r", "ESP:D8", "green", [ "h144.8", "v96.4" ] ],
+    [ "No:2.l", "ESP:GND", "black", [ "h-9.6", "v19.6", "h144", "v38.4" ] ],
+    [ "Yes:2.l", "ESP:GND", "black", [ "h-9.6", "v29.2", "h230.4", "v28.8" ] ],
+    [ "AI:2.l", "ESP:GND", "black", [ "v29", "h230.4", "v86.4" ] ],
+    [ "AI:1.r", "ESP:D9", "green", [ "v19.4", "h153.8", "v124.8" ] ],
+    [ "Yes:1.r", "ESP:D7", "green", [ "h10.4", "v0.4", "h17.6", "v134.4", "h153.6", "v-28.8" ] ]
+  ],
+  "dependencies": {}
+}

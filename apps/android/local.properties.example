@@ -1,0 +1,8 @@
+# Google TTS API Key
+# 1. Google Cloud Console'dan API key alın
+#    https://console.cloud.google.com/apis/credentials
+# 2. Bu dosyayı local.properties olarak kopyalayın
+# 3. API key'i ekleyin
+# 4. local.properties dosyası .gitignore'da olduğu için GitHub'a commit edilmeyecek
+GOOGLE_TTS_API_KEY=your-api-key-here
+

@@ -1,0 +1,31 @@
+{
+  "name": "wokwi-ble-bridge",
+  "version": "1.0.0",
+  "description": "Wokwi Serial to BLE Bridge Server for Engelsiz Yaşam Asistanı",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "echo \"No build step required\" && exit 0"
+  },
+  "keywords": [
+    "wokwi",
+    "ble",
+    "bridge",
+    "serial",
+    "bluetooth"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@abandonware/bleno": "^0.6.2",
+    "@serialport/parser-readline": "^12.0.0",
+    "dotenv": "^16.3.1",
+    "serialport": "^12.0.0",
+    "winston": "^3.11.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}
