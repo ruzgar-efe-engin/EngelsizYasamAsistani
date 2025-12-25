@@ -1,0 +1,192 @@
+# ============================================
+# Root .gitignore - EngelsizYasamAsistani
+# ============================================
+
+# ============================================
+# Geçici Dosyalar ve Klasörler
+# ============================================
+tmp/
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# ============================================
+# İşletim Sistemi Dosyaları
+# ============================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+
+# ============================================
+# IDE ve Editör Dosyaları
+# ============================================
+# Android Studio / IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# Cursor
+.cursor/
+
+# Eclipse
+.classpath
+.project
+.settings/
+bin/
+
+# NetBeans
+nbproject/
+nbbuild/
+dist/
+nbdist/
+.nb-gradle/
+
+# ============================================
+# Android / Gradle
+# ============================================
+# Build dosyaları
+build/
+.gradle/
+local.properties
+*.apk
+*.ap_
+*.aab
+*.aar
+*.dex
+*.class
+
+# Keystore dosyaları
+*.jks
+*.keystore
+*.pfx
+
+# Android Studio
+.externalNativeBuild
+.cxx/
+
+# ============================================
+# Node.js / npm
+# ============================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Environment dosyaları
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+
+# Package manager lock files (opsiyonel - eğer lock file'ları commit etmek istiyorsanız bunları kaldırın)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# ============================================
+# PlatformIO / Embedded
+# ============================================
+.pio/
+.pioenvs/
+.piolibdeps/
+.vscode/.browse.c_cpp.db*
+.vscode/c_cpp_properties.json
+.vscode/launch.json
+.vscode/ipch
+
+# PlatformIO build dosyaları
+build_flags.h
+
+# ============================================
+# Log Dosyaları
+# ============================================
+*.log
+logs/
+*.log.*
+
+# ============================================
+# Test ve Coverage
+# ============================================
+coverage/
+.nyc_output/
+*.lcov
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+
+# ============================================
+# Sertifika ve Key Dosyaları
+# ============================================
+*.pem
+*.key
+*.crt
+*.cert
+*.p12
+*.pfx
+
+# ============================================
+# Backup ve Archive Dosyaları
+# ============================================
+*.bak
+*.backup
+*.old
+*.orig
+*.zip
+*.tar.gz
+*.rar
+
+# ============================================
+# Database Dosyaları
+# ============================================
+*.db
+*.sqlite
+*.sqlite3
+
+# ============================================
+# Diğer
+# ============================================
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# Rust (eğer gelecekte kullanılırsa)
+target/
+Cargo.lock
+
+# Go (eğer gelecekte kullanılırsa)
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
