@@ -199,7 +199,19 @@ void sendEvent(EventType type, uint8_t m = 0, uint8_t s = 0) {
   event.subIndex = s;            // Alt menü pozisyonunu ayarla
   event.ts = millis();           // Zaman damgası ekle (milisaniye cinsinden)
   
+  // Event gönderim log'u
+  Serial.print("[DEBUG] sendEvent çağrıldı: type=");
+  Serial.print(type);
+  Serial.print(" m=");
+  Serial.print(m);
+  Serial.print(" s=");
+  Serial.print(s);
+  Serial.print(" ts=");
+  Serial.println(event.ts);
+  
   eventTransport.sendEvent(event); // Event'i gönder (Serial veya BLE)
+  
+  Serial.println("[DEBUG] sendEvent tamamlandı");
 }
 
 
@@ -252,6 +264,10 @@ static uint32_t loopCount = 0;     // Loop sayacı (ilk 10 loop'u atlamak için)
 static uint32_t lastAiReleaseTime = 0;      // AI butonu son bırakılma zamanı
 static uint32_t lastSubSwReleaseTime = 0;   // SubSW butonu son bırakılma zamanı
 static const uint32_t BUTTON_RELEASE_DEBOUNCE_MS = 100; // Buton bırakıldıktan sonra 100ms bekle
+
+// AI butonuna uzun basış için zaman takibi (Pairing mode için)
+static uint32_t aiPressStartTime = 0;       // AI butonu basılı tutma başlangıç zamanı
+static const uint32_t LONG_PRESS_MS = 5000; // 5 saniye basılı tutma süresi
 
 /* ============================================================================
  * LOOP() - Ana Döngü Fonksiyonu
@@ -315,8 +331,7 @@ void loop() {
   // BUTON OKUMA (Butonları Oku ve Event Gönder)
   // ========================================================================
   
-  // AI Button (AI Butonu - Basılı Tutma Desteği)
-  // SubSW butonu gibi basit edge detection kullan
+  // AI Button (AI Butonu - Basılı Tutma Desteği ve Pairing Mode)
   uint8_t aiState = digitalRead(PIN_AI);
   
   if (aiState == LOW && !aiPressed) {
@@ -325,14 +340,26 @@ void loop() {
     uint32_t now = millis();
     if (lastAiReleaseTime == 0 || (now - lastAiReleaseTime >= BUTTON_RELEASE_DEBOUNCE_MS)) {
       aiPressed = true;
+      aiPressStartTime = now; // Basılı tutma başlangıcını kaydet
       // Event gönder: AI butonu basıldı
       sendEvent(AI_PRESS, mainIndex, subIndex);
+    }
+  } else if (aiState == LOW && aiPressed) {
+    // Buton hala basılı - uzun basış kontrolü (Pairing mode için)
+    uint32_t now = millis();
+    if (aiPressStartTime != 0 && (now - aiPressStartTime >= LONG_PRESS_MS)) {
+      // 5 saniye geçti - pairing mode'u başlat
+      Serial.println("[DEBUG] AI butonu 5 saniye basılı tutuldu - Pairing mode başlatılıyor");
+      eventTransport.enablePairingMode();
+      aiPressStartTime = 0; // Tekrar tetiklenmesini önle
+      Serial.println("[DEBUG] Pairing mode başlatıldı");
     }
   } else if (aiState == HIGH && aiPressed) {
     // Buton bırakıldı
     aiPressed = false;
     uint32_t now = millis();
     lastAiReleaseTime = now;  // Bırakılma zamanını kaydet (bounce önleme için)
+    aiPressStartTime = 0;      // Basılı tutma zamanını sıfırla
     // Event gönder: AI butonu bırakıldı (basılı tutma sona erdi)
     sendEvent(AI_RELEASE, mainIndex, subIndex);
   }
@@ -356,8 +383,8 @@ void loop() {
   }
   
   // Bluetooth durumunu kontrol et ve LED'i yanıp söndür (bağlantı yoksa)
-  #ifdef TRANSPORT_BLE
   eventTransport.updateAdvertisingStatus();
+  #ifdef TRANSPORT_BLE
   eventTransport.handleConnection();
   #endif
   

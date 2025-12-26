@@ -39,6 +39,8 @@ class IEventTransport {
 public:
   virtual ~IEventTransport() {}
   virtual void sendEvent(const Event& event) = 0;
+  virtual void enablePairingMode() {}
+  virtual void updateAdvertisingStatus() {}
 };
 
 /* =========================================================
@@ -53,6 +55,15 @@ public:
   }
 
   void sendEvent(const Event& event) override {
+    Serial.print("[DEBUG] SerialEventTransport.sendEvent çağrıldı: type=");
+    Serial.print(event.type);
+    Serial.print(" m=");
+    Serial.print(event.mainIndex);
+    Serial.print(" s=");
+    Serial.print(event.subIndex);
+    Serial.print(" ts=");
+    Serial.println(event.ts);
+    
     // LED tetikleme - sendEvent() içinde
     digitalWrite(_ledPin, HIGH);
     delay(30);
@@ -92,10 +103,56 @@ public:
     
     Serial.print(" ts=");
     Serial.println(event.ts);
+    
+    Serial.println("[DEBUG] SerialEventTransport.sendEvent tamamlandı");
+  }
+  
+  // Pairing mode'u başlat (30 saniyelik pairing window)
+  void enablePairingMode() override {
+    Serial.println("[DEBUG] SerialEventTransport.enablePairingMode çağrıldı");
+    _pairingModeActive = true;
+    _pairingModeStartTime = millis();
+    Serial.println("[BLE] Pairing mode aktif - 30 saniye");
+    Serial.println("[DEBUG] SerialEventTransport.enablePairingMode tamamlandı");
+  }
+  
+  // Advertising durumunu kontrol et ve LED'i yanıp söndür
+  void updateAdvertisingStatus() override {
+    static uint32_t lastBlinkTime = 0;
+    static bool ledState = false;
+    uint32_t now = millis();
+    
+    // Pairing mode kontrolü
+    if (_pairingModeActive) {
+      uint32_t elapsed = now - _pairingModeStartTime;
+      if (elapsed >= PAIRING_MODE_DURATION_MS) {
+        // 30 saniye geçti - pairing mode'u kapat
+        _pairingModeActive = false;
+        Serial.println("[BLE] Pairing mode sona erdi");
+      } else {
+        // Pairing mode aktif - LED hızlı yanıp sönsün (250ms)
+        if (now - lastBlinkTime >= 250) {
+          ledState = !ledState;
+          digitalWrite(_ledPin, ledState ? HIGH : LOW);
+          lastBlinkTime = now;
+        }
+        return; // Pairing mode'da normal advertising status'u atla
+      }
+    }
+    
+    // Normal durumda LED kapalı (Serial transport için)
+    if (ledState) {
+      digitalWrite(_ledPin, LOW);
+      ledState = false;
+    }
+    lastBlinkTime = now;
   }
 
 private:
   uint8_t _ledPin;
+  bool _pairingModeActive = false;
+  uint32_t _pairingModeStartTime = 0;
+  static const uint32_t PAIRING_MODE_DURATION_MS = 30000; // 30 saniye
 };
 
 /* =========================================================
@@ -110,15 +167,15 @@ private:
 
 class BLEEventTransport : public IEventTransport {
 public:
-  BLEEventTransport(uint8_t ledPin) : _ledPin(ledPin), _deviceConnected(false), _oldDeviceConnected(false) {
+  BLEEventTransport(uint8_t ledPin) : _ledPin(ledPin), _deviceConnected(false), _oldDeviceConnected(false), _pairingModeActive(false), _pairingModeStartTime(0) {
     pinMode(_ledPin, OUTPUT);
     digitalWrite(_ledPin, LOW);
     
     // BLE başlat (constructor'da başlatma, enableBLE() ile kontrol edilebilir)
-    // İlk başta kapalı başlat, YES butonu ile açılacak
+    // İlk başta kapalı başlat, AI butonuna 5 saniye basılı tutarak açılacak
     // BLEDevice::init("GormeEngellilerKumanda");
     
-    Serial.println("[BLE] Bluetooth kapalı başlatıldı. YES butonunu 3 saniye basılı tutarak açabilirsiniz.");
+    Serial.println("[BLE] Bluetooth kapalı başlatıldı. AI butonuna 5 saniye basılı tutarak açabilirsiniz.");
   }
 
   void sendEvent(const Event& event) override {
@@ -161,8 +218,9 @@ public:
     }
     
     if (_deviceConnected && !_oldDeviceConnected) {
-      // Yeni bağlantı
-      Serial.println("[BLE] Cihaz bağlandı!");
+      // Yeni bağlantı - pairing mode'u kapat
+      _pairingModeActive = false;
+      Serial.println("[BLE] Cihaz bağlandı - Pairing mode sona erdi");
       _oldDeviceConnected = _deviceConnected;
     }
   }
@@ -227,13 +285,45 @@ public:
     return BLEDevice::getInitialized();
   }
   
+  // Pairing mode'u başlat (30 saniyelik pairing window)
+  void enablePairingMode() {
+    Serial.println("[DEBUG] BLEEventTransport.enablePairingMode çağrıldı");
+    enableBLE(); // BLE'yi aç
+    Serial.println("[DEBUG] BLE açıldı");
+    _pairingModeActive = true;
+    _pairingModeStartTime = millis();
+    Serial.println("[BLE] Pairing mode aktif - 30 saniye");
+    Serial.println("[DEBUG] BLEEventTransport.enablePairingMode tamamlandı");
+  }
+  
   // Advertising durumunu kontrol et ve LED'i yanıp söndür (bağlantı yoksa)
   void updateAdvertisingStatus() {
     static uint32_t lastBlinkTime = 0;
     static bool ledState = false;
     uint32_t now = millis();
     
-    // Bağlantı yoksa ve BLE açıksa LED'i yanıp söndür
+    // Pairing mode kontrolü
+    if (_pairingModeActive) {
+      uint32_t elapsed = now - _pairingModeStartTime;
+      if (elapsed >= PAIRING_MODE_DURATION_MS) {
+        // 30 saniye geçti - pairing mode'u kapat
+        _pairingModeActive = false;
+        if (!_deviceConnected) {
+          disableBLE(); // Bağlantı yoksa BLE'yi kapat
+        }
+        Serial.println("[BLE] Pairing mode sona erdi");
+      } else {
+        // Pairing mode aktif - LED hızlı yanıp sönsün (250ms)
+        if (now - lastBlinkTime >= 250) {
+          ledState = !ledState;
+          digitalWrite(_ledPin, ledState ? HIGH : LOW);
+          lastBlinkTime = now;
+        }
+        return; // Pairing mode'da normal advertising status'u atla
+      }
+    }
+    
+    // Normal advertising status (bağlantı yoksa ve BLE açıksa LED'i yanıp söndür)
     if (!_deviceConnected && isBLEEnabled()) {
       if (now - lastBlinkTime >= 500) {  // 500ms'de bir yanıp sönsün
         ledState = !ledState;
@@ -257,6 +347,9 @@ private:
   BLECharacteristic* _pCharacteristic;
   bool _deviceConnected;
   bool _oldDeviceConnected;
+  bool _pairingModeActive = false;
+  uint32_t _pairingModeStartTime = 0;
+  static const uint32_t PAIRING_MODE_DURATION_MS = 30000; // 30 saniye
   
   // BLE Server Callbacks
   class MyServerCallbacks: public BLEServerCallbacks {
@@ -305,6 +398,10 @@ public:
   }
   
   void setDeviceConnected(bool connected) {
+    // Stub: Simülasyon modunda işlem yok
+  }
+  
+  void enablePairingMode() {
     // Stub: Simülasyon modunda işlem yok
   }
 

@@ -4,35 +4,40 @@ import android.Manifest
 import android.bluetooth.BluetoothDevice
 import android.content.pm.PackageManager
 import android.os.Build
+import android.util.Log
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.gormeengelliler.android.manager.MenuManager
+import com.gormeengelliler.android.model.DeviceEvent
 import com.gormeengelliler.android.service.BLEManager
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 enum class ConnectionStatus {
@@ -58,9 +63,49 @@ fun SetupScreen(
     var connectionStatus by remember { mutableStateOf<ConnectionStatus>(ConnectionStatus.NOT_CONNECTED) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var selectedDevice by remember { mutableStateOf<BluetoothDevice?>(null) }
+    var isPairingMode by remember { mutableStateOf(false) }
+    var pairingTimeRemaining by remember { mutableStateOf(30) }
+    
+    // Event log state
+    var eventLogs by remember { mutableStateOf<List<String>>(emptyList()) }
+    val maxLogEntries = 100
+    
+    // Collapse panel states
+    var welcomeExpanded by remember { mutableStateOf(true) }
+    var languageExpanded by remember { mutableStateOf(false) }
+    var devicePairingExpanded by remember { mutableStateOf(false) }
     
     val bleManager = remember { BLEManager(context) }
     val snackbarHostState = remember { SnackbarHostState() }
+    
+    // Event formatı dönüşümü - JSON event'i [BLE] formatına çevir
+    fun formatEventLog(event: DeviceEvent): String {
+        // Log formatı: sendEvent çağrıldı: type=X m=Y s=Z - Paket alındı
+        val logParts = mutableListOf<String>()
+        logParts.add("sendEvent çağrıldı: type=${event.type.value}")
+        
+        // mainIndex sadece ilgili event'lerde
+        if (event.type == com.gormeengelliler.android.model.EventType.MAIN_ROTATE || 
+            event.type == com.gormeengelliler.android.model.EventType.SUB_ROTATE || 
+            event.type == com.gormeengelliler.android.model.EventType.CONFIRM || 
+            event.type == com.gormeengelliler.android.model.EventType.EVENT_CANCEL || 
+            event.type == com.gormeengelliler.android.model.EventType.AI_PRESS || 
+            event.type == com.gormeengelliler.android.model.EventType.AI_RELEASE) {
+            logParts.add("m=${event.mainIndex}")
+        }
+        
+        // subIndex sadece ilgili event'lerde
+        if (event.type == com.gormeengelliler.android.model.EventType.SUB_ROTATE || 
+            event.type == com.gormeengelliler.android.model.EventType.CONFIRM || 
+            event.type == com.gormeengelliler.android.model.EventType.EVENT_CANCEL || 
+            event.type == com.gormeengelliler.android.model.EventType.AI_PRESS || 
+            event.type == com.gormeengelliler.android.model.EventType.AI_RELEASE) {
+            logParts.add("s=${event.subIndex}")
+        }
+        
+        logParts.add("- Paket alındı")
+        return logParts.joinToString(" ")
+    }
     
     // BLE Manager callbacks
     LaunchedEffect(bleManager) {
@@ -70,16 +115,49 @@ fun SetupScreen(
             }
         }
         
+        // Event log callback - BLE'den gelen event'leri log formatına çevir
+        // Wokwi terminal formatı: [BLE] EVENT_TYPE m=X s=Y ts=Z
+        bleManager.onEventReceived = { jsonString ->
+            android.util.Log.d("SetupScreen", "📥 Event alındı (BLE): $jsonString")
+            try {
+                val event = DeviceEvent.fromJson(jsonString)
+                if (event != null) {
+                    val logLine = formatEventLog(event)
+                    android.util.Log.d("SetupScreen", "✅ Event parse edildi: $logLine")
+                    // Anında event log paneline ekle (Wokwi terminal formatında)
+                    eventLogs = (eventLogs + logLine).takeLast(maxLogEntries)
+                } else {
+                    android.util.Log.e("SetupScreen", "❌ Event parse edilemedi: $jsonString")
+                    // Parse edilemese bile raw JSON'u göster
+                    eventLogs = (eventLogs + "[BLE] RAW: $jsonString").takeLast(maxLogEntries)
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("SetupScreen", "❌ Event işleme hatası: ${e.message}")
+                eventLogs = (eventLogs + "[BLE] ERROR: ${e.message} - $jsonString").takeLast(maxLogEntries)
+            }
+        }
+        
         bleManager.onConnectionStateChanged = { state ->
             when (state) {
                 android.bluetooth.BluetoothProfile.STATE_CONNECTED -> {
                     connectionStatus = ConnectionStatus.CONNECTED
                     menuManager.setSelectedLanguage(selectedLanguage)
+                    
+                    // Bağlantı başarılı olduğunda UUID bilgilerini log'a ekle
+                    val uuidLogs = listOf(
+                        "[BLE] Bağlantı başarılı!",
+                        "[BLE] Service UUID: 12345678-1234-1234-1234-123456789abc",
+                        "[BLE] Characteristic UUID: 12345678-1234-1234-1234-123456789abd"
+                    )
+                    eventLogs = uuidLogs
+                    devicePairingExpanded = false // Cihaz eşleme panelini gizle
+                    
                     scope.launch {
                         snackbarHostState.showSnackbar("Cihaz başarıyla bağlandı!")
                     }
-                    // Setup tamamlandı, service başlatılacak
-                    onSetupComplete()
+                    // NOT: Setup tamamlandı diye uygulamayı arka plana alma.
+                    // Bu ekranda event log'u gerçek zamanlı göstermek istiyoruz; arka plana alınırsa
+                    // ekran kapanır/abonelik düşebilir ve log akışı kaybolur.
                 }
                 android.bluetooth.BluetoothProfile.STATE_DISCONNECTED -> {
                     if (connectionStatus == ConnectionStatus.CONNECTING) {
@@ -92,6 +170,34 @@ fun SetupScreen(
                 android.bluetooth.BluetoothProfile.STATE_CONNECTING -> {
                     connectionStatus = ConnectionStatus.CONNECTING
                 }
+            }
+        }
+    }
+    
+    // Pairing mode countdown
+    LaunchedEffect(isPairingMode) {
+        if (isPairingMode) {
+            pairingTimeRemaining = 30
+            while (isPairingMode && pairingTimeRemaining > 0) {
+                delay(1000)
+                pairingTimeRemaining--
+                if (pairingTimeRemaining <= 0) {
+                    isPairingMode = false
+                    isScanning = false
+                    bleManager.stopScan()
+                }
+            }
+        }
+    }
+    
+    // Auto-connect when device found in pairing mode
+    LaunchedEffect(scannedDevices, isPairingMode) {
+        if (isPairingMode && scannedDevices.isNotEmpty() && connectionStatus != ConnectionStatus.CONNECTED) {
+            scannedDevices.firstOrNull()?.let { device ->
+                connectionStatus = ConnectionStatus.CONNECTING
+                bleManager.connect(device)
+                isPairingMode = false
+                isScanning = false
             }
         }
     }
@@ -122,130 +228,130 @@ fun SetupScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // ScrollView ekle
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+            // 1. Hoşgeldiniz Paneli
+            ExpandableCard(
+                title = "Hoş Geldiniz",
+                icon = Icons.Default.Info,
+                expanded = welcomeExpanded,
+                onExpandedChange = { welcomeExpanded = it }
             ) {
-                // Hoşgeldin mesajı
-                AnimatedVisibility(
-                    visible = true,
-                    enter = fadeIn(animationSpec = tween(300)) + slideInVertically(initialOffsetY = { -it }),
-                    modifier = Modifier.fillMaxWidth()
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = "Bilgi ikonu",
-                            modifier = Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = "Hoş Geldiniz",
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            style = MaterialTheme.typography.headlineMedium
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Engelsiz Yaşam Asistanı cihazınızı telefonunuzla bağlamak için aşağıdaki adımları takip edin.",
-                            fontSize = 14.sp,
-                            textAlign = TextAlign.Center,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = "Bilgi ikonu",
+                        modifier = Modifier.size(64.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "Engelsiz Yaşam Asistanı",
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Cihazınızı telefonunuzla bağlamak için aşağıdaki adımları takip edin. Önce dil seçiminizi yapın, sonra cihaz eşleme işlemini başlatın.",
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 20.sp
+                    )
                 }
-                }
-                
-                // Dil seçimi
-                AnimatedVisibility(
-                    visible = true,
-                    enter = fadeIn(animationSpec = tween(400, delayMillis = 100)) + slideInVertically(initialOffsetY = { -it }),
-                    modifier = Modifier.fillMaxWidth()
+            }
+            
+            // 2. Dil Seçimi Paneli
+            ExpandableCard(
+                title = "Seslendirme Dili",
+                icon = Icons.Default.Settings,
+                expanded = languageExpanded,
+                onExpandedChange = { languageExpanded = it }
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp)
+                    val languages = listOf("tr" to "Türkçe", "en" to "English", "de" to "Deutsch")
+                    
+                    languages.forEach { (code, name) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { selectedLanguage = code }
+                                .padding(vertical = 12.dp, horizontal = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "Seslendirme Dili",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(bottom = 12.dp)
+                            RadioButton(
+                                selected = selectedLanguage == code,
+                                onClick = { selectedLanguage = code }
                             )
-                            
-                            val languages = listOf("tr" to "Türkçe", "en" to "English", "de" to "Deutsch")
-                            
-                            languages.forEach { (code, name) ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable { selectedLanguage = code }
-                                        .padding(vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    RadioButton(
-                                        selected = selectedLanguage == code,
-                                        onClick = { selectedLanguage = code },
-                                        modifier = Modifier.semantics {
-                                            contentDescription = "$name dil seçeneği"
-                                        }
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = name,
-                                        fontSize = 16.sp,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                }
-                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = name,
+                                fontSize = 16.sp,
+                                modifier = Modifier.weight(1f)
+                            )
                         }
                     }
                 }
-                }
-                
-                // Cihaz arama bölümü
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            }
+            
+            // 3. Cihaz Eşleme Paneli veya Event Log Paneli
+            if (connectionStatus == ConnectionStatus.CONNECTED) {
+                // Bağlantı başarılı - Event Log göster
+                ExpandableCard(
+                    title = "Event Log",
+                    icon = Icons.Default.Info,
+                    expanded = true,
+                    onExpandedChange = { }
                 ) {
+                    EventLogView(eventLogs = eventLogs)
+                }
+            } else {
+                // Bağlantı yok - Cihaz Eşleme göster
+                ExpandableCard(
+                    title = "Cihaz Eşleme",
+                    icon = Icons.Default.Settings,
+                    expanded = devicePairingExpanded,
+                    onExpandedChange = { devicePairingExpanded = it }
+                ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Talimat - Gri arka plan kaldırıldı, sadece border ve glassmorphism
                     Column(
-                        modifier = Modifier.padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                    Text(
-                        text = "Cihaz Bağlantısı",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    )
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "Talimat ikonu",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "Cihazınızda AI butonuna 5 saniye basılı tutun",
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                     
+                    // Butonlar
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // Cihaz Ara butonu
                         Button(
                             onClick = {
                                 if (!hasBluetoothPermissions) {
@@ -258,18 +364,11 @@ fun SetupScreen(
                                     return@Button
                                 }
                                 
+                                isPairingMode = true
+                                pairingTimeRemaining = 30
                                 scannedDevices = emptyList()
                                 isScanning = true
                                 bleManager.startScan()
-                                
-                                // 30 saniye sonra otomatik durdur
-                                scope.launch {
-                                    kotlinx.coroutines.delay(30000)
-                                    if (isScanning) {
-                                        bleManager.stopScan()
-                                        isScanning = false
-                                    }
-                                }
                             },
                             enabled = !isScanning && connectionStatus != ConnectionStatus.CONNECTED,
                             modifier = Modifier.weight(1f)
@@ -289,201 +388,316 @@ fun SetupScreen(
                             }
                         }
                         
-                        // Aramayı Durdur butonu
                         OutlinedButton(
                             onClick = {
                                 bleManager.stopScan()
                                 isScanning = false
+                                isPairingMode = false
                             },
                             enabled = isScanning,
                             modifier = Modifier.weight(1f)
                         ) {
-                            Icon(Icons.Default.Close, contentDescription = "Durdur ikonu")
+                            Icon(Icons.Default.Close, contentDescription = "Vazgeç ikonu")
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Durdur")
+                            Text("Vazgeç")
                         }
                     }
                     
-                    // Yeniden Ara butonu
-                    if (!isScanning && scannedDevices.isEmpty() && connectionStatus == ConnectionStatus.NOT_CONNECTED) {
-                        TextButton(
-                            onClick = {
-                                scannedDevices = emptyList()
-                                isScanning = true
-                                bleManager.startScan()
-                            }
-                        ) {
-                            Icon(Icons.Default.Refresh, contentDescription = "Yenile ikonu")
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Yeniden Ara")
-                        }
-                    }
-                }
-                }
-                
-                // Bulunan cihazlar listesi header
-                if (scannedDevices.isNotEmpty()) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                    ) {
+                    // Pairing mode UI - Gri arka plan kaldırıldı
+                    if (isPairingMode) {
                         Column(
-                            modifier = Modifier.padding(16.dp)
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(64.dp),
+                                strokeWidth = 4.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
                             Text(
-                                text = "Bulunan Cihazlar (${scannedDevices.size})",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold
+                                text = "Eşleştirme Modu Aktif",
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "${pairingTimeRemaining} saniye kaldı",
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
                             )
                         }
                     }
                     
-                    scannedDevices.forEach { device ->
-                        DeviceCard(
-                            device = device,
-                            isSelected = selectedDevice?.address == device.address,
-                            onClick = {
-                                selectedDevice = device
-                            }
+                    // Bulunan cihazlar listesi
+                    if (scannedDevices.isNotEmpty()) {
+                        Text(
+                            text = "Bulunan Cihazlar (${scannedDevices.size})",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(vertical = 8.dp)
                         )
-                    }
-                }
-                
-                // Empty state - sadece cihaz listesi için
-                if (scannedDevices.isEmpty() && !isScanning && connectionStatus == ConnectionStatus.NOT_CONNECTED) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Info,
-                                contentDescription = "Bluetooth arama ikonu",
-                                modifier = Modifier.size(48.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text(
-                                text = "Henüz cihaz bulunamadı",
-                                fontSize = 16.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = "Yukarıdaki 'Cihaz Ara' butonuna basarak aramayı başlatın",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.padding(top = 8.dp)
+                        
+                        scannedDevices.forEach { device ->
+                            DeviceCard(
+                                device = device,
+                                isSelected = selectedDevice?.address == device.address,
+                                onClick = {
+                                    selectedDevice = device
+                                    if (connectionStatus != ConnectionStatus.CONNECTED) {
+                                        connectionStatus = ConnectionStatus.CONNECTING
+                                        bleManager.connect(device)
+                                    }
+                                }
                             )
                         }
                     }
-                }
-                
-                // Eşleştirme butonu
-                if (selectedDevice != null && connectionStatus != ConnectionStatus.CONNECTED) {
-                    Button(
-                            onClick = {
-                                selectedDevice?.let { device ->
-                                    connectionStatus = ConnectionStatus.CONNECTING
-                                    bleManager.connect(device)
-                                }
-                            },
-                            enabled = connectionStatus != ConnectionStatus.CONNECTING,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            if (connectionStatus == ConnectionStatus.CONNECTING) {
+                    
+                    // Bağlantı durumu
+                    when (connectionStatus) {
+                        ConnectionStatus.CONNECTING -> {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 CircularProgressIndicator(
-                                    modifier = Modifier.size(16.dp),
-                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.size(20.dp),
                                     strokeWidth = 2.dp
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Bağlanıyor...")
-                            } else {
-                                Icon(Icons.Default.Check, contentDescription = "Bağlantı ikonu")
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Eşleştir")
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text("Bağlanıyor...", color = MaterialTheme.colorScheme.primary)
                             }
                         }
+                        ConnectionStatus.CONNECTED -> {
+                            // Gri arka plan kaldırıldı
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = "Bağlantı başarılı ikonu",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    text = "Bağlandı!",
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                        ConnectionStatus.ERROR -> {
+                            // Gri arka plan kaldırıldı
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Warning,
+                                    contentDescription = "Hata ikonu",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    text = errorMessage ?: "Bağlantı hatası!",
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                        else -> {}
                     }
                 }
-                
-                // Bağlantı durumu göstergesi
-                if (connectionStatus != ConnectionStatus.NOT_CONNECTED) {
-                    when (connectionStatus) {
-                ConnectionStatus.CONNECTING -> {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text("Bağlanıyor...", color = MaterialTheme.colorScheme.primary)
-                    }
-                }
-                ConnectionStatus.CONNECTED -> {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(MaterialTheme.colorScheme.primaryContainer)
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.CheckCircle,
-                            contentDescription = "Bağlantı başarılı ikonu",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = "Bağlandı!",
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-                ConnectionStatus.ERROR -> {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(MaterialTheme.colorScheme.errorContainer)
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Warning,
-                            contentDescription = "Hata ikonu",
-                            tint = MaterialTheme.colorScheme.error
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = errorMessage ?: "Bağlantı hatası!",
-                            color = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                    }
-                }
-                else -> {
-                    Spacer(modifier = Modifier.height(0.dp))
                 }
             }
+        }
+    }
+    
+    // Error message handling
+    LaunchedEffect(errorMessage) {
+        errorMessage?.let { message ->
+            scope.launch {
+                snackbarHostState.showSnackbar(message)
+                errorMessage = null
+            }
+        }
+    }
+}
+
+// Glassmorphism Card Component
+@Composable
+fun ExpandableCard(
+    title: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    content: @Composable () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessLow
+                )
+            )
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.25f),
+                        Color.White.copy(alpha = 0.15f)
+                    )
+                ),
+                shape = RoundedCornerShape(20.dp)
+            )
+            .border(
+                width = 1.dp,
+                color = Color.White.copy(alpha = 0.3f),
+                shape = RoundedCornerShape(20.dp)
+            ),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.Transparent
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 16.dp)
+    ) {
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onExpandedChange(!expanded) }
+                    .padding(20.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = title,
+                    modifier = Modifier.size(28.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
+                )
+                Icon(
+                    imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    contentDescription = if (expanded) "Kapat" else "Aç",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             
-            // Error message handling
-            LaunchedEffect(errorMessage) {
-                errorMessage?.let { message ->
-                    scope.launch {
-                        snackbarHostState.showSnackbar(message)
-                        errorMessage = null
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessLow
+                    )
+                ) + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                Divider(
+                    modifier = Modifier.padding(horizontal = 20.dp),
+                    color = Color.White.copy(alpha = 0.2f)
+                )
+                content()
+            }
+        }
+    }
+}
+
+// Terminal benzeri Event Log View
+@Composable
+fun EventLogView(eventLogs: List<String>) {
+    val scrollState = rememberScrollState()
+    
+    // Yeni log geldiğinde en alta scroll yap
+    LaunchedEffect(eventLogs.size) {
+        if (eventLogs.isNotEmpty()) {
+            scrollState.animateScrollTo(scrollState.maxValue)
+        }
+    }
+    
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(400.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.Black.copy(alpha = 0.8f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            // Header
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.Black.copy(alpha = 0.9f))
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = "Event log ikonu",
+                    tint = Color.Green,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "BLE Event Log",
+                    color = Color.Green,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            
+            Divider(color = Color.Gray.copy(alpha = 0.3f))
+            
+            // Log content
+            if (eventLogs.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Event bekleniyor...",
+                        color = Color.Gray,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 12.sp
+                    )
+                }
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(scrollState)
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    eventLogs.forEach { logLine ->
+                        Text(
+                            text = logLine,
+                            color = Color.Green,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
                 }
             }
@@ -500,12 +714,13 @@ fun DeviceCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isSelected) {
                 MaterialTheme.colorScheme.primaryContainer
             } else {
-                MaterialTheme.colorScheme.surfaceVariant
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
             }
         ),
         border = if (isSelected) {
@@ -513,7 +728,10 @@ fun DeviceCard(
                 2.dp,
                 MaterialTheme.colorScheme.primary
             )
-        } else null
+        } else null,
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = if (isSelected) 8.dp else 2.dp
+        )
     ) {
         Row(
             modifier = Modifier
@@ -522,7 +740,7 @@ fun DeviceCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                imageVector = Icons.Default.Info,
+                imageVector = Icons.Default.Settings,
                 contentDescription = "Bluetooth cihaz ikonu",
                 tint = if (isSelected) {
                     MaterialTheme.colorScheme.primary
