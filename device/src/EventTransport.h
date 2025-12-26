@@ -70,11 +70,9 @@ public:
       case AI_RELEASE: typeStr = "AI_RELEASE"; break;
     }
 
-    // Kompakt BLE log formatı: [BLE] THEME_ROTATE t=2 m=1 s=0 ts=12345
+    // Kompakt log formatı: [BLE] MAIN_ROTATE m=15 ts=12345
     Serial.print("[BLE] ");
     Serial.print(typeStr);
-    Serial.print(" t=");
-    Serial.print(event.themeIndex);
     
     // mainIndex sadece ilgili event'lerde
     if (event.type == MAIN_ROTATE || event.type == SUB_ROTATE || 
@@ -328,11 +326,9 @@ public:
       case AI_RELEASE: typeStr = "AI_RELEASE"; break;
     }
 
-    // Kompakt BLE log formatı: [BLE] THEME_ROTATE t=2 m=1 s=0 ts=12345
+    // Kompakt log formatı: [BLE] MAIN_ROTATE m=15 ts=12345
     Serial.print("[BLE] ");
     Serial.print(typeStr);
-    Serial.print(" t=");
-    Serial.print(event.themeIndex);
     
     // mainIndex sadece ilgili event'lerde
     if (event.type == MAIN_ROTATE || event.type == SUB_ROTATE || 

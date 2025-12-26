@@ -10,8 +10,8 @@
  * Sadece pozisyon değişikliklerini ve buton olaylarını bildirir.
  * 
  * Mimari:
- * - Encoder'lar: Tema, Ana Menü, Alt Menü pozisyonlarını takip eder
- * - Butonlar: YES, NO, AI, SubSW - kullanıcı seçimlerini bildirir
+ * - Encoder'lar: Ana Menü, Alt Menü pozisyonlarını takip eder
+ * - Butonlar: AI, SubSW - kullanıcı seçimlerini bildirir
  * - Event Transport: Serial (simülasyon) veya BLE (gerçek cihaz)
  * - LED: Fiziksel geri bildirim (kullanıcı aksiyonu anlaşıldığında yanar), gerçek cihazda titreşim motoru olabilir.
  * 
@@ -51,9 +51,6 @@
  * - Pull-up resistor kullanılır (INPUT_PULLUP)
  * - Basılıyken LOW, basılı değilken HIGH okunur
  */
-// Theme Encoder (Tema Seçimi) - En üst seviye menü
-#define PIN_THEME_CLK D0  // Clock pin
-#define PIN_THEME_DT  D1  // Data pin
 
 // Main Menu Encoder (Ana Menü Seçimi) - İkinci seviye menü
 #define PIN_MAIN_CLK  D2  // Clock pin
@@ -65,8 +62,6 @@
 #define PIN_SUB_SW    D6  // Switch (buton) - encoder üzerindeki basma butonu
 
 // Buttons (Butonlar)
-#define PIN_YES       D7  // Evet/Onay butonu
-#define PIN_NO        D8  // Hayır/İptal butonu
 #define PIN_AI        D9  // AI butonu (basılı tutma için)
 
 // LED (Geri Bildirim)
@@ -80,10 +75,8 @@
  * Her pozisyon bir index (sayı) olarak tutulur.
  * 
  * Örnek:
- * - themeIndex = 2 → "3. tema" (0'dan başlar)
  * - mainIndex = 1 → "2. ana menü öğesi"
  * - subIndex = 0 → "1. alt menü öğesi"
- * - themeIndex = 255 → "256. tema" (sınırsız artabilir)
  * - mainIndex = 255 → "256. ana menü öğesi" (sınırsız artabilir)
  * - subIndex = 255 → "256. alt menü öğesi" (sınırsız artabilir),
  * - 255'den büyük değerler mevcut değil, o yüzden başa döner.
@@ -92,7 +85,7 @@
  * 
  * Bu index'ler mobile app'e gönderilir, app menü içeriğini bilir ve TTS ile okur.
  */
-int themeIndex = 0;  // Tema pozisyonu (0'dan başlar, sınırsız artabilir)
+ 
 int mainIndex  = 0;  // Ana menü pozisyonu (0'dan başlar, sınırsız artabilir)
 int subIndex   = 0;  // Alt menü pozisyonu (0'dan başlar, sınırsız artabilir)
 
@@ -162,7 +155,6 @@ private:
 };
 
 // Encoder nesnelerini oluştur (her encoder için bir instance)
-Encoder encTheme(PIN_THEME_CLK, PIN_THEME_DT);  // Tema encoder'ı
 Encoder encMain (PIN_MAIN_CLK,  PIN_MAIN_DT);  // Ana menü encoder'ı
 Encoder encSub  (PIN_SUB_CLK,   PIN_SUB_DT);   // Alt menü encoder'ı
 
@@ -190,22 +182,19 @@ BLEEventTransport eventTransport(PIN_LED);
  * Kullanıcı etkileşimlerini event formatına çevirip gönderir.
  * 
  * Parametreler:
- * - type: Event türü (THEME_ROTATE, CONFIRM, AI_PRESS, vb.)
- * - t: themeIndex (tema pozisyonu)
+ * - type: Event türü (MAIN_ROTATE, SUB_ROTATE, CONFIRM, AI_PRESS, AI_RELEASE)
  * - m: mainIndex (ana menü pozisyonu, opsiyonel, varsayılan 0)
  * - s: subIndex (alt menü pozisyonu, opsiyonel, varsayılan 0)
  * 
  * Event yapısı:
  * - type: Hangi olay olduğu (döndürme, buton basma, vb.)
- * - themeIndex: Hangi temada
  * - mainIndex: Hangi ana menü öğesinde
  * - subIndex: Hangi alt menü öğesinde
  * - ts: Timestamp (millis() - olayın zamanı)
  */
-void sendEvent(EventType type, uint8_t t, uint8_t m = 0, uint8_t s = 0) {
+void sendEvent(EventType type, uint8_t m = 0, uint8_t s = 0) {
   Event event;                    // Event yapısı oluştur
   event.type = type;              // Event türünü ayarla
-  event.themeIndex = t;           // Tema pozisyonunu ayarla
   event.mainIndex = m;            // Ana menü pozisyonunu ayarla
   event.subIndex = s;            // Alt menü pozisyonunu ayarla
   event.ts = millis();           // Zaman damgası ekle (milisaniye cinsinden)
@@ -231,13 +220,10 @@ void setup() {
 
   // Buton pin'lerini INPUT_PULLUP olarak ayarla
   // Pull-up: Pin'e dahili direnç bağlı, basılı değilken HIGH, basılıyken LOW
-  pinMode(PIN_YES, INPUT_PULLUP);    // YES butonu
-  pinMode(PIN_NO,  INPUT_PULLUP);   // NO butonu
   pinMode(PIN_AI,  INPUT_PULLUP);   // AI butonu
   pinMode(PIN_SUB_SW, INPUT_PULLUP); // Sub Menu Switch butonu
 
   // Encoder'ları başlat (pin'leri ayarlar ve başlangıç durumunu okur)
-  encTheme.begin();  // Tema encoder'ı
   encMain.begin();  // Ana menü encoder'ı
   encSub.begin();   // Alt menü encoder'ı
 
@@ -258,24 +244,14 @@ void setup() {
  * 
  * static: Fonksiyon dışında erişilebilir ama global scope'u kirletmez
  */
-static bool yesPressed = false;    // YES butonu basılı mı?
-static bool noPressed = false;     // NO butonu basılı mı?
 static bool aiPressed = false;     // AI butonu basılı mı?
 static bool subSwPressed = false;   // Sub Menu Switch basılı mı?
 static uint32_t loopCount = 0;     // Loop sayacı (ilk 10 loop'u atlamak için)
 
 // Buton bırakıldıktan sonra bounce'u önlemek için zaman takibi
-static uint32_t lastYesReleaseTime = 0;   // YES butonu son bırakılma zamanı
-static uint32_t lastNoReleaseTime = 0;    // NO butonu son bırakılma zamanı
-static uint32_t lastSubSwReleaseTime = 0; // SubSW butonu son bırakılma zamanı
+static uint32_t lastAiReleaseTime = 0;      // AI butonu son bırakılma zamanı
+static uint32_t lastSubSwReleaseTime = 0;   // SubSW butonu son bırakılma zamanı
 static const uint32_t BUTTON_RELEASE_DEBOUNCE_MS = 100; // Buton bırakıldıktan sonra 100ms bekle
-
-// Bluetooth kontrolü için buton basılı tutma takibi
-static uint32_t yesPressStartTime = 0;    // YES butonu basılmaya başlandığı zaman
-static uint32_t noPressStartTime = 0;     // NO butonu basılmaya başlandığı zaman
-static bool yesLongPressHandled = false;  // YES uzun basış işlendi mi?
-static bool noLongPressHandled = false;   // NO uzun basış işlendi mi?
-static const uint32_t LONG_PRESS_MS = 3000; // 3 saniye basılı tutma süresi
 
 /* ============================================================================
  * LOOP() - Ana Döngü Fonksiyonu
@@ -296,14 +272,15 @@ void loop() {
   // Bu, cihaz açıldığında butonların yanlış tetiklenmesini önler
   if (loopCount < 10) {
     // Butonların mevcut durumunu oku ve flag'leri ayarla
-    // Eğer buton başlangıçta basılıysa, ilk gerçek basışta tetiklenmez
-    yesPressed = (digitalRead(PIN_YES) == LOW);      // LOW = basılı
-    noPressed = (digitalRead(PIN_NO) == LOW);
-    aiPressed = (digitalRead(PIN_AI) == LOW);
+    // Eğer buton başlangıçta basılıysa, aiPressed = false yap
+    // Böylece buton bırakıldığında (HIGH) ilk gerçek basışta tetiklenir
+    uint8_t aiStateInit = digitalRead(PIN_AI);
+    aiPressed = false;  // Her zaman false ile başla
+    lastAiReleaseTime = 0;  // Sıfırla
+    
     subSwPressed = (digitalRead(PIN_SUB_SW) == LOW);
     
     // Encoder'ları da oku (başlangıç durumunu kaydetmek için)
-    encTheme.readStep();
     encMain.readStep();
     encSub.readStep();
     return;  // İlk 10 loop'ta sadece durumları oku, event gönderme
@@ -314,154 +291,50 @@ void loop() {
   // ========================================================================
   
   // Her encoder'ı oku ve dönüş miktarını al
-  // dTheme, dMain, dSub: -1 (ters yön), 0 (dönüş yok), +1 (ileri yön)
-  int8_t dTheme = encTheme.readStep();  // Tema encoder'ı
+  // dMain, dSub: -1 (ters yön), 0 (dönüş yok), +1 (ileri yön)
   int8_t dMain  = encMain.readStep();   // Ana menü encoder'ı
   int8_t dSub   = encSub.readStep();    // Alt menü encoder'ı
-
-  // Tema Encoder döndü mü?
-  if (dTheme != 0) {
-    themeIndex += dTheme;  // Pozisyonu güncelle (+1 veya -1)
-    // Tema değiştiğinde alt seviye menüleri sıfırla
-    mainIndex = 0;  // Ana menü sıfırla
-    subIndex = 0;   // Alt menü sıfırla
-    // Event gönder: Tema değişti, yeni tema pozisyonu
-    sendEvent(THEME_ROTATE, themeIndex);
-  }
 
   // Ana Menü Encoder döndü mü?
   if (dMain != 0) {
     mainIndex += dMain;  // Pozisyonu güncelle (+1 veya -1)
     // Ana menü değiştiğinde alt menüyü sıfırla
     subIndex = 0;  // Alt menü sıfırla
-    // Event gönder: Ana menü değişti, tema ve ana menü pozisyonu
-    sendEvent(MAIN_ROTATE, themeIndex, mainIndex);
+    // Event gönder: Ana menü değişti
+    sendEvent(MAIN_ROTATE, mainIndex);
   }
 
   // Alt Menü Encoder döndü mü?
   if (dSub != 0) {
     subIndex += dSub;  // Pozisyonu güncelle (+1 veya -1)
-    // Event gönder: Alt menü değişti, tüm pozisyonlar
-    sendEvent(SUB_ROTATE, themeIndex, mainIndex, subIndex);
+    // Event gönder: Alt menü değişti
+    sendEvent(SUB_ROTATE, mainIndex, subIndex);
   }
 
   // ========================================================================
   // BUTON OKUMA (Butonları Oku ve Event Gönder)
   // ========================================================================
   
-  // YES Button (Evet/Onay Butonu)
-  uint8_t yesState = digitalRead(PIN_YES);  // Butonun şu anki durumu
-  uint32_t now = millis();  // Şu anki zaman (debounce için)
-  
-  if (yesState == LOW && !yesPressed) {
-    // Buton basıldı (LOW) ve önceki durum basılı değildi
-    // Bırakıldıktan sonra yeterli süre geçti mi kontrol et (bounce önleme)
-    if (now - lastYesReleaseTime >= BUTTON_RELEASE_DEBOUNCE_MS) {
-      yesPressed = true;  // Flag'i güncelle
-      yesPressStartTime = now;  // Basılmaya başlandığı zamanı kaydet
-      yesLongPressHandled = false;  // Uzun basış henüz işlenmedi
-      // Event gönder: Onay butonu basıldı, mevcut pozisyonlarla
-      sendEvent(CONFIRM, themeIndex, mainIndex, subIndex);
-    }
-  } else if (yesState == LOW && yesPressed && !yesLongPressHandled) {
-    // Buton hala basılı ve 3 saniye geçti mi kontrol et
-    if (now - yesPressStartTime >= LONG_PRESS_MS) {
-      yesLongPressHandled = true;  // Uzun basış işlendi
-      
-      // Bluetooth kontrolü (sadece BLE modunda)
-      #ifdef TRANSPORT_BLE
-      Serial.println("[BLE] YES butonu 3 saniye basılı tutuldu - Bluetooth kontrolü");
-      // Bluetooth açık değilse aç, açıksa advertising'i yeniden başlat
-      if (!eventTransport.isBLEEnabled()) {
-        Serial.println("[BLE] Bluetooth kapalı, açılıyor...");
-        eventTransport.enableBLE();
-        Serial.println("[BLE] ✅ YES butonu ile Bluetooth açıldı");
-      } else {
-        Serial.println("[BLE] Bluetooth zaten açık, advertising yeniden başlatılıyor...");
-        // Zaten açıksa advertising'i yeniden başlat (arama moduna geç)
-        eventTransport.enableBLE(); // Bu fonksiyon advertising'i de başlatır
-        Serial.println("[BLE] ✅ YES butonu ile arama moduna geçildi");
-      }
-      // Artık LED yanıp sönecek (updateAdvertisingStatus tarafından)
-      Serial.println("[BLE] LED 3 kez yanıp söndü, şimdi yanıp sönmeye devam edecek (bağlantı yoksa)");
-      #else
-      // Serial modunda (Wokwi simülasyonu)
-      // Bridge server zaten sürekli BLE advertising yapıyor
-      // Wokwi simülasyonundan gelen Serial verileri bridge server'a gidecek
-      Serial.println("[SERIAL] YES butonu 3 saniye basılı tutuldu");
-      Serial.println("[SERIAL] Bridge server BLE advertising yapıyor, mobile app cihazı bulabilir");
-      #endif
-      
-      // LED feedback: 3 kez yanıp sönsün (her iki modda da çalışır)
-      for (int i = 0; i < 3; i++) {
-        digitalWrite(PIN_LED, HIGH);
-        delay(100);
-        digitalWrite(PIN_LED, LOW);
-        delay(100);
-      }
-    }
-  } else if (yesState == HIGH && yesPressed) {
-    // Buton bırakıldı (HIGH) ve önceki durum basılıydı
-    yesPressed = false;  // Flag'i sıfırla
-    yesLongPressHandled = false;  // Uzun basış flag'ini sıfırla
-    lastYesReleaseTime = now;  // Bırakılma zamanını kaydet (bounce önleme için)
-  }
-
-  // NO Button (Hayır/İptal Butonu)
-  uint8_t noState = digitalRead(PIN_NO);
-  if (noState == LOW && !noPressed) {
-    // Buton basıldı
-    // Bırakıldıktan sonra yeterli süre geçti mi kontrol et (bounce önleme)
-    if (now - lastNoReleaseTime >= BUTTON_RELEASE_DEBOUNCE_MS) {
-      noPressed = true;
-      noPressStartTime = now;  // Basılmaya başlandığı zamanı kaydet
-      noLongPressHandled = false;  // Uzun basış henüz işlenmedi
-      // Event gönder: İptal butonu basıldı
-      sendEvent(EVENT_CANCEL, themeIndex, mainIndex, subIndex);
-    }
-  } else if (noState == LOW && noPressed && !noLongPressHandled) {
-    // Buton hala basılı ve 3 saniye geçti mi kontrol et
-    if (now - noPressStartTime >= LONG_PRESS_MS) {
-      noLongPressHandled = true;  // Uzun basış işlendi
-      
-      // Bluetooth kontrolü (sadece BLE modunda)
-      #ifdef TRANSPORT_BLE
-      if (eventTransport.isBLEEnabled()) {
-        eventTransport.disableBLE();
-        Serial.println("[BLE] NO butonu ile Bluetooth kapatıldı");
-      }
-      #else
-      // Serial modunda (Wokwi simülasyonu)
-      Serial.println("[SERIAL] NO butonu 3 saniye basılı tutuldu (Bluetooth kontrolü sadece BLE modunda)");
-      #endif
-      
-      // LED feedback: 5 kez yanıp sönsün (kapatma onayı - her iki modda da çalışır)
-      for (int i = 0; i < 5; i++) {
-        digitalWrite(PIN_LED, HIGH);
-        delay(100);
-        digitalWrite(PIN_LED, LOW);
-        delay(100);
-      }
-    }
-  } else if (noState == HIGH && noPressed) {
-    // Buton bırakıldı
-    noPressed = false;
-    noLongPressHandled = false;  // Uzun basış flag'ini sıfırla
-    lastNoReleaseTime = now;  // Bırakılma zamanını kaydet (bounce önleme için)
-  }
-
   // AI Button (AI Butonu - Basılı Tutma Desteği)
+  // SubSW butonu gibi basit edge detection kullan
   uint8_t aiState = digitalRead(PIN_AI);
+  
   if (aiState == LOW && !aiPressed) {
     // Buton basıldı
-    aiPressed = true;
-    // Event gönder: AI butonu basıldı
-    sendEvent(AI_PRESS, themeIndex, mainIndex, subIndex);
+    // Bırakıldıktan sonra yeterli süre geçti mi kontrol et (bounce önleme)
+    uint32_t now = millis();
+    if (lastAiReleaseTime == 0 || (now - lastAiReleaseTime >= BUTTON_RELEASE_DEBOUNCE_MS)) {
+      aiPressed = true;
+      // Event gönder: AI butonu basıldı
+      sendEvent(AI_PRESS, mainIndex, subIndex);
+    }
   } else if (aiState == HIGH && aiPressed) {
     // Buton bırakıldı
     aiPressed = false;
+    uint32_t now = millis();
+    lastAiReleaseTime = now;  // Bırakılma zamanını kaydet (bounce önleme için)
     // Event gönder: AI butonu bırakıldı (basılı tutma sona erdi)
-    sendEvent(AI_RELEASE, themeIndex, mainIndex, subIndex);
+    sendEvent(AI_RELEASE, mainIndex, subIndex);
   }
 
   // Sub Menu Switch (Alt Menü Encoder'ındaki Basma Butonu)
@@ -469,14 +342,16 @@ void loop() {
   if (subSwState == LOW && !subSwPressed) {
     // Buton basıldı
     // Bırakıldıktan sonra yeterli süre geçti mi kontrol et (bounce önleme)
+    uint32_t now = millis();
     if (now - lastSubSwReleaseTime >= BUTTON_RELEASE_DEBOUNCE_MS) {
       subSwPressed = true;
       // Event gönder: Alt menü switch'i basıldı (onay işlemi)
-      sendEvent(CONFIRM, themeIndex, mainIndex, subIndex);
+      sendEvent(CONFIRM, mainIndex, subIndex);
     }
   } else if (subSwState == HIGH && subSwPressed) {
     // Buton bırakıldı
     subSwPressed = false;
+    uint32_t now = millis();
     lastSubSwReleaseTime = now;  // Bırakılma zamanını kaydet (bounce önleme için)
   }
   
