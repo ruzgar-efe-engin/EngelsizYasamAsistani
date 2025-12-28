@@ -82,7 +82,7 @@ Wokwi'nin web tabanlı GDB debugger'ını da kullanabilirsiniz:
 break main.cpp:282
 
 # Değişken değerini göster
-print themeIndex
+print mainIndex
 
 # Adım adım ilerle
 step

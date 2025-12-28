@@ -1,4 +1,5 @@
 @echo off
+setlocal enabledelayedexpansion
 REM Engelsiz Yaşam Asistanı - Android Build Script (Windows)
 REM Bu script Android projesini build eder ve gerekli kurulumları yapar
 
@@ -219,7 +220,24 @@ if not exist "gradle.properties" (
 )
 
 REM ==========================================
-REM 7. Build İşlemi (Tek Komut)
+REM 7. Clean Build İşlemi
+REM ==========================================
+echo.
+echo [INFO] Clean build yapılıyor...
+
+REM Android SDK platform-tools PATH'ini ekle (adb için)
+set PATH=%ANDROID_HOME%\platform-tools;%PATH%
+
+REM Clean işlemi
+call gradlew.bat clean --no-daemon
+if %ERRORLEVEL% NEQ 0 (
+    echo [WARNING] Clean işlemi sırasında uyarı oluştu, devam ediliyor...
+)
+
+echo [OK] Clean tamamlandı
+
+REM ==========================================
+REM 8. Build İşlemi
 REM ==========================================
 echo.
 echo [INFO] Proje build ediliyor (dependencies + compile + APK)...
@@ -240,8 +258,65 @@ echo ==========================================
 echo.
 echo APK dosyası: build\outputs\apk\debug\EngelsizYasamAsistani-debug.apk
 echo.
-echo Cihaza yüklemek için:
-echo   gradlew.bat installDebug
+
+REM ==========================================
+REM 9. Cihaza Yükleme (Opsiyonel)
+REM ==========================================
+echo [INFO] Cihaza yükleme işlemi...
+echo.
+
+REM ADB cihaz kontrolü
+where adb >nul 2>&1
+if %ERRORLEVEL% NEQ 0 (
+    echo [WARNING] ADB bulunamadı! (Android SDK platform-tools)
+    echo    Cihaza manuel yüklemek için:
+    echo    adb install -r build\outputs\apk\debug\EngelsizYasamAsistani-debug.apk
+    goto :end_install
+)
+
+REM Cihaz sayısını kontrol et
+set DEVICE_COUNT=0
+set DEVICE_ID=
+for /f "tokens=1,*" %%a in ('adb devices ^| findstr /C:"device"') do (
+    set /a DEVICE_COUNT+=1
+    if !DEVICE_COUNT!==1 (
+        set DEVICE_ID=%%a
+    )
+)
+
+if %DEVICE_COUNT%==0 (
+    echo [WARNING] Bağlı cihaz bulunamadı!
+    echo    USB ile bağlı bir cihaz veya emulator bekleniyor...
+    echo.
+    echo Cihaza manuel yüklemek için:
+    echo   adb install -r build\outputs\apk\debug\EngelsizYasamAsistani-debug.apk
+    goto :end_install
+)
+
+if %DEVICE_COUNT%==1 (
+    REM Tek cihaz bulundu
+    echo [INFO] Tek cihaz bulundu: %DEVICE_ID%
+    echo [INFO] Eski APK kaldırılıyor...
+    adb -s %DEVICE_ID% uninstall com.gormeengelliler.android >nul 2>&1
+    echo [INFO] Yeni APK yükleniyor...
+    adb -s %DEVICE_ID% install -r build\outputs\apk\debug\EngelsizYasamAsistani-debug.apk
+    if %ERRORLEVEL% EQU 0 (
+        echo [OK] APK başarıyla yüklendi!
+    ) else (
+        echo [ERROR] APK yükleme hatası!
+    )
+) else (
+    REM Birden fazla cihaz
+    echo [WARNING] Birden fazla cihaz bulundu!
+    echo    Cihazlar:
+    adb devices | findstr /C:"device"
+    echo.
+    echo Belirli bir cihaza yüklemek için:
+    echo   adb -s ^<DEVICE_ID^> uninstall com.gormeengelliler.android
+    echo   adb -s ^<DEVICE_ID^> install -r build\outputs\apk\debug\EngelsizYasamAsistani-debug.apk
+)
+
+:end_install
 echo.
 echo Tam build (lint dahil) için:
 echo   gradlew.bat build

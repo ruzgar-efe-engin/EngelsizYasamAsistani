@@ -122,8 +122,8 @@ Bu değerler device'daki `EventTransport.h` ve mobile app'lerdeki BLEManager'lar
 
 Bridge server iki formatı destekler:
 
-1. **Text Format**: `[BLE] THEME_ROTATE t=2 m=1 s=0 ts=12345`
-2. **JSON Format**: `{"type":0,"themeIndex":2,"mainIndex":1,"subIndex":0,"ts":12345}`
+1. **Text Format**: `[BLE] MAIN_ROTATE m=1 s=0 ts=12345`
+2. **JSON Format**: `{"type":0,"mainIndex":1,"subIndex":0,"ts":12345}`
 
 ## Best Practices
 

@@ -3,13 +3,12 @@ package com.gormeengelliler.android.model
 import org.json.JSONObject
 
 enum class EventType(val value: Int) {
-    THEME_ROTATE(0),
-    MAIN_ROTATE(1),
-    SUB_ROTATE(2),
-    CONFIRM(3),
-    EVENT_CANCEL(4),
-    AI_PRESS(5),
-    AI_RELEASE(6);
+    MAIN_ROTATE(0),
+    SUB_ROTATE(1),
+    CONFIRM(2),
+    EVENT_CANCEL(3),
+    AI_PRESS(4),
+    AI_RELEASE(5);
     
     companion object {
         fun fromInt(value: Int): EventType? {
@@ -20,7 +19,6 @@ enum class EventType(val value: Int) {
 
 data class DeviceEvent(
     val type: EventType,
-    val themeIndex: Int,
     val mainIndex: Int = 0,
     val subIndex: Int = 0,
     val ts: Long = 0
@@ -34,7 +32,6 @@ data class DeviceEvent(
                 
                 DeviceEvent(
                     type = type,
-                    themeIndex = json.getInt("themeIndex"),
                     mainIndex = json.optInt("mainIndex", 0),
                     subIndex = json.optInt("subIndex", 0),
                     ts = json.getLong("ts")

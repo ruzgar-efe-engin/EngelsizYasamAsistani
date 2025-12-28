@@ -78,9 +78,11 @@ if [ -z "$ANDROID_HOME" ]; then
     fi
 fi
 
+# Android SDK platform-tools PATH'ini ekle (adb için)
 export PATH="$ANDROID_HOME/emulator:$ANDROID_HOME/tools:$ANDROID_HOME/tools/bin:$ANDROID_HOME/platform-tools:$PATH"
 
 echo "✅ ANDROID_HOME: $ANDROID_HOME"
+echo "✅ PATH'e platform-tools eklendi: $ANDROID_HOME/platform-tools"
 
 # Emulator kontrolü
 if [ ! -f "$ANDROID_HOME/emulator/emulator" ]; then

@@ -9,19 +9,18 @@ class EventParser {
     constructor() {
         // Event type mapping
         this.typeMap = {
-            'THEME_ROTATE': 0,
-            'MAIN_ROTATE': 1,
-            'SUB_ROTATE': 2,
-            'CONFIRM': 3,
-            'CANCEL': 4,
-            'EVENT_CANCEL': 4,
-            'AI_PRESS': 5,
-            'AI_RELEASE': 6
+            'MAIN_ROTATE': 0,
+            'SUB_ROTATE': 1,
+            'CONFIRM': 2,
+            'CANCEL': 3,
+            'EVENT_CANCEL': 3,
+            'AI_PRESS': 4,
+            'AI_RELEASE': 5
         };
     }
 
     /**
-     * Text formatını parse et: [BLE] THEME_ROTATE t=2 m=1 s=0 ts=12345
+     * Text formatını parse et: [BLE] MAIN_ROTATE m=1 s=0 ts=12345
      * @param {string} line - Parse edilecek satır
      * @returns {Object|null} Event object veya null
      */
@@ -37,14 +36,12 @@ class EventParser {
             }
 
             // Parametreleri parse et
-            const tMatch = line.match(/t=(\d+)/);
             const mMatch = line.match(/m=(\d+)/);
             const sMatch = line.match(/s=(\d+)/);
             const tsMatch = line.match(/ts=(\d+)/);
 
             const event = {
                 type: eventType,
-                themeIndex: tMatch ? parseInt(tMatch[1]) : 0,
                 mainIndex: mMatch ? parseInt(mMatch[1]) : 0,
                 subIndex: sMatch ? parseInt(sMatch[1]) : 0,
                 ts: tsMatch ? parseInt(tsMatch[1]) : Date.now()
@@ -57,7 +54,7 @@ class EventParser {
     }
 
     /**
-     * JSON formatını parse et: {"type":0,"themeIndex":2,"mainIndex":1,"subIndex":0,"ts":12345}
+     * JSON formatını parse et: {"type":0,"mainIndex":1,"subIndex":0,"ts":12345}
      * @param {string} jsonString - Parse edilecek JSON string
      * @returns {Object|null} Event object veya null
      */

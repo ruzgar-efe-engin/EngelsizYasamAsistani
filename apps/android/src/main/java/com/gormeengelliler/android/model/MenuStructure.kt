@@ -64,43 +64,21 @@ data class MainMenu(
     }
 }
 
-data class Theme(
-    val id: Int,
-    val name: MenuName,
-    val mainMenus: List<MainMenu>
-) {
-    companion object {
-        fun fromJson(json: JSONObject): Theme {
-            val mainMenusArray = json.getJSONArray("mainMenus")
-            val mainMenus = mutableListOf<MainMenu>()
-            for (i in 0 until mainMenusArray.length()) {
-                mainMenus.add(MainMenu.fromJson(mainMenusArray.getJSONObject(i)))
-            }
-            
-            return Theme(
-                id = json.getInt("id"),
-                name = MenuName.fromJson(json.getJSONObject("name")),
-                mainMenus = mainMenus
-            )
-        }
-    }
-}
-
 data class MenuStructure(
-    val themes: List<Theme>
+    val mainMenus: List<MainMenu>
 ) {
     companion object {
         fun fromJson(jsonString: String): MenuStructure? {
             return try {
                 val json = JSONObject(jsonString)
-                val themesArray = json.getJSONArray("themes")
-                val themes = mutableListOf<Theme>()
+                val mainMenusArray = json.getJSONArray("mainMenus")
+                val mainMenus = mutableListOf<MainMenu>()
                 
-                for (i in 0 until themesArray.length()) {
-                    themes.add(Theme.fromJson(themesArray.getJSONObject(i)))
+                for (i in 0 until mainMenusArray.length()) {
+                    mainMenus.add(MainMenu.fromJson(mainMenusArray.getJSONObject(i)))
                 }
                 
-                MenuStructure(themes = themes)
+                MenuStructure(mainMenus = mainMenus)
             } catch (e: Exception) {
                 null
             }

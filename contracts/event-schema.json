@@ -6,13 +6,8 @@
   "properties": {
     "type": {
       "type": "integer",
-      "enum": [0, 1, 2, 3, 4, 5, 6],
-      "description": "Event tipi: 0=THEME_ROTATE, 1=MAIN_ROTATE, 2=SUB_ROTATE, 3=CONFIRM, 4=CANCEL, 5=AI_PRESS, 6=AI_RELEASE"
-    },
-    "themeIndex": {
-      "type": "integer",
-      "minimum": 0,
-      "description": "Tema pozisyon index'i"
+      "enum": [0, 1, 2, 3, 4, 5],
+      "description": "Event tipi: 0=MAIN_ROTATE, 1=SUB_ROTATE, 2=CONFIRM, 3=CANCEL, 4=AI_PRESS, 5=AI_RELEASE"
     },
     "mainIndex": {
       "type": "integer",
@@ -30,6 +25,6 @@
       "description": "Timestamp (millis()) - debug, debounce, log korelasyonu için"
     }
   },
-  "required": ["type", "themeIndex", "ts"]
+  "required": ["type", "ts"]
 }
 

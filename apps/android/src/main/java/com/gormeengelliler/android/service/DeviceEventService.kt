@@ -7,6 +7,8 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
@@ -22,7 +24,7 @@ import com.gormeengelliler.android.model.EventType
 
 class DeviceEventService : Service() {
     private val binder = LocalBinder()
-    private lateinit var bleManager: BLEManager
+    private lateinit var transportProvider: EventTransportProvider
     private lateinit var menuManager: MenuManager
     private lateinit var ttsManager: TTSManager
     private lateinit var confirmHandler: ConfirmHandler
@@ -31,40 +33,85 @@ class DeviceEventService : Service() {
     private val CHANNEL_ID = "DeviceEventServiceChannel"
     private val NOTIFICATION_ID = 1
     
+    // Bip sesi için ToneGenerator - scroll döndürüldüğünde geri bildirim
+    private var toneGenerator: ToneGenerator? = null
+    
     inner class LocalBinder : Binder() {
         fun getService(): DeviceEventService = this@DeviceEventService
     }
     
     override fun onCreate() {
         super.onCreate()
+        android.util.Log.d("DeviceEventService", "\n🚀 ========================================")
+        android.util.Log.d("DeviceEventService", "🚀 onCreate() ÇAĞRILDI")
+        android.util.Log.d("DeviceEventService", "========================================")
         
         createNotificationChannel()
         
         // Managers'ı başlat
+        android.util.Log.d("DeviceEventService", "📦 Managers başlatılıyor...")
         menuManager = MenuManager(this)
         ttsManager = TTSManager(this, menuManager)
         confirmHandler = ConfirmHandler(this, menuManager, ttsManager)
         cancelHandler = CancelHandler(ttsManager, menuManager)
-        bleManager = BLEManager(this)
-        
-        // BLE event listener
-        bleManager.onEventReceived = { jsonString ->
-            handleEvent(jsonString)
+        transportProvider = EventTransportProvider(this).apply {
+            initialize(TransportType.BLE) // Varsayılan: BLE
         }
         
-        // BLE connection state listener
-        bleManager.onConnectionStateChanged = { state ->
-            // Connection state değişikliklerini handle et
+        // ToneGenerator başlat - scroll geri bildirimi için
+        try {
+            toneGenerator = ToneGenerator(AudioManager.STREAM_MUSIC, ToneGenerator.MAX_VOLUME)
+            android.util.Log.d("DeviceEventService", "✅ ToneGenerator başlatıldı")
+        } catch (e: Exception) {
+            android.util.Log.e("DeviceEventService", "❌ ToneGenerator başlatılamadı: ${e.message}")
         }
+        
+        android.util.Log.d("DeviceEventService", "✅ Managers başlatıldı")
+        
+        // Transport event listener
+        transportProvider.getCurrentTransport()?.let { transport ->
+            transport.onEventReceived = { jsonString ->
+                android.util.Log.d("DeviceEventService", "📥 Transport event alındı: $jsonString")
+                handleEvent(jsonString)
+            }
+            
+            // Transport connection state listener
+            transport.onConnectionStateChanged = { isConnected ->
+                android.util.Log.d("DeviceEventService", "🔄 Transport connection state değişti: $isConnected")
+                // Connection state değişikliklerini handle et
+            }
+        }
+        
+        android.util.Log.d("DeviceEventService", "✅ onCreate() tamamlandı")
     }
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        android.util.Log.d("DeviceEventService", "\n🚀 ========================================")
+        android.util.Log.d("DeviceEventService", "🚀 onStartCommand() ÇAĞRILDI")
+        android.util.Log.d("DeviceEventService", "   flags: $flags, startId: $startId")
+        android.util.Log.d("DeviceEventService", "========================================")
+        
         startForeground(NOTIFICATION_ID, createNotification())
+        android.util.Log.d("DeviceEventService", "✅ Foreground notification başlatıldı")
         
-        // BLE bağlantısını başlat (eğer daha önce bağlanmışsa)
+        // Transport bağlantısını başlat (eğer daha önce bağlanmışsa)
         // Bu kısım Setup UI'dan gelecek
+        android.util.Log.d("DeviceEventService", "💡 Transport bağlantısı Setup UI'dan başlatılacak")
         
+        android.util.Log.d("DeviceEventService", "✅ onStartCommand() tamamlandı - START_STICKY dönüyor")
         return START_STICKY
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        android.util.Log.d("DeviceEventService", "\n🛑 ========================================")
+        android.util.Log.d("DeviceEventService", "🛑 onDestroy() ÇAĞRILDI")
+        android.util.Log.d("DeviceEventService", "========================================")
+        
+        // ToneGenerator'ı temizle
+        toneGenerator?.release()
+        toneGenerator = null
+        android.util.Log.d("DeviceEventService", "✅ ToneGenerator temizlendi")
     }
     
     override fun onBind(intent: Intent?): IBinder {
@@ -104,21 +151,22 @@ class DeviceEventService : Service() {
             .build()
     }
     
-    fun connectToDevice(deviceAddress: String) {
-        // Device address'ten device'ı bul ve bağlan
+    fun connectToDevice(deviceId: String) {
+        // Device ID'den device'a bağlan
         // Bu kısım Setup UI'dan çağrılacak
+        transportProvider.getCurrentTransport()?.connect(deviceId)
     }
     
-    fun startBLEScan() {
-        bleManager.startScan()
+    fun startScan() {
+        transportProvider.getCurrentTransport()?.startScan()
     }
     
-    fun stopBLEScan() {
-        bleManager.stopScan()
+    fun stopScan() {
+        transportProvider.getCurrentTransport()?.stopScan()
     }
     
-    fun connectBLE(device: android.bluetooth.BluetoothDevice) {
-        bleManager.connect(device)
+    fun connect(deviceId: String) {
+        transportProvider.getCurrentTransport()?.connect(deviceId)
     }
     
     private fun handleEvent(jsonString: String) {
@@ -128,21 +176,20 @@ class DeviceEventService : Service() {
         ttsManager.stop()
         
         when (event.type) {
-            EventType.THEME_ROTATE -> {
-                val themeName = menuManager.getThemeName(event.themeIndex)
-                themeName?.let {
-                    ttsManager.speakAsync(it)
-                }
-            }
             EventType.MAIN_ROTATE -> {
-                val mainMenuName = menuManager.getMainMenuName(event.themeIndex, event.mainIndex)
+                // Scroll geri bildirimi - bip sesi
+                playScrollBeep()
+                
+                val mainMenuName = menuManager.getMainMenuName(event.mainIndex)
                 mainMenuName?.let {
                     ttsManager.speakAsync(it)
                 }
             }
             EventType.SUB_ROTATE -> {
+                // Scroll geri bildirimi - bip sesi
+                playScrollBeep()
+                
                 val subMenuName = menuManager.getSubMenuName(
-                    event.themeIndex,
                     event.mainIndex,
                     event.subIndex
                 )
@@ -151,7 +198,7 @@ class DeviceEventService : Service() {
                 }
             }
             EventType.CONFIRM -> {
-                confirmHandler.confirm(event.themeIndex, event.mainIndex, event.subIndex)
+                confirmHandler.confirm(event.mainIndex, event.subIndex)
             }
             EventType.EVENT_CANCEL -> {
                 cancelHandler.handleCancel()
@@ -162,8 +209,8 @@ class DeviceEventService : Service() {
         }
     }
     
-    fun getBLEManager(): BLEManager {
-        return bleManager
+    fun getTransportProvider(): EventTransportProvider {
+        return transportProvider
     }
     
     fun getMenuManager(): MenuManager {
@@ -172,6 +219,18 @@ class DeviceEventService : Service() {
     
     fun getTTSManager(): TTSManager {
         return ttsManager
+    }
+    
+    /**
+     * Scroll döndürüldüğünde bip sesi çıkar - geri bildirim için
+     */
+    private fun playScrollBeep() {
+        try {
+            toneGenerator?.startTone(ToneGenerator.TONE_PROP_BEEP, 50) // 50ms kısa bip
+            android.util.Log.d("DeviceEventService", "🔊 Scroll bip sesi çalındı")
+        } catch (e: Exception) {
+            android.util.Log.e("DeviceEventService", "❌ Bip sesi çalınamadı: ${e.message}")
+        }
     }
 }
 

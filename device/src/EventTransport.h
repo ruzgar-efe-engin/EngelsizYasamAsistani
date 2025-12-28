@@ -14,18 +14,16 @@
    ========================================================= */
 
 enum EventType : uint8_t {
-  THEME_ROTATE = 0,
-  MAIN_ROTATE = 1,
-  SUB_ROTATE = 2,
-  CONFIRM = 3,
-  EVENT_CANCEL = 4,
-  AI_PRESS = 5,
-  AI_RELEASE = 6
+  MAIN_ROTATE = 0,
+  SUB_ROTATE = 1,
+  CONFIRM = 2,
+  EVENT_CANCEL = 3,
+  AI_PRESS = 4,
+  AI_RELEASE = 5
 };
 
 struct Event {
   EventType type;
-  uint8_t themeIndex;
   uint8_t mainIndex;  // opsiyonel
   uint8_t subIndex;   // opsiyonel
   uint32_t ts;        // millis() - debug, debounce, log korelasyonu için kritik
@@ -72,7 +70,6 @@ public:
     // Event type string'e çevir
     const char* typeStr = "";
     switch (event.type) {
-      case THEME_ROTATE: typeStr = "THEME_ROTATE"; break;
       case MAIN_ROTATE: typeStr = "MAIN_ROTATE"; break;
       case SUB_ROTATE: typeStr = "SUB_ROTATE"; break;
       case CONFIRM: typeStr = "CONFIRM"; break;
@@ -187,7 +184,6 @@ public:
     // Event'i JSON formatında hazırla
     String json = "{";
     json += "\"type\":" + String(event.type) + ",";
-    json += "\"themeIndex\":" + String(event.themeIndex) + ",";
     json += "\"mainIndex\":" + String(event.mainIndex) + ",";
     json += "\"subIndex\":" + String(event.subIndex) + ",";
     json += "\"ts\":" + String(event.ts);
@@ -414,7 +410,6 @@ public:
     // Event type string'e çevir
     const char* typeStr = "";
     switch (event.type) {
-      case THEME_ROTATE: typeStr = "THEME_ROTATE"; break;
       case MAIN_ROTATE: typeStr = "MAIN_ROTATE"; break;
       case SUB_ROTATE: typeStr = "SUB_ROTATE"; break;
       case CONFIRM: typeStr = "CONFIRM"; break;

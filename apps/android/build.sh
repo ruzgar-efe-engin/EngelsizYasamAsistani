@@ -267,14 +267,32 @@ EOF
 fi
 
 # ==========================================
-# 7. Build İşlemi (Tek Komut)
+# 7. Clean Build İşlemi
 # ==========================================
 echo ""
-echo "🔨 Proje build ediliyor (dependencies + compile + APK)..."
+echo "🧹 Clean build yapılıyor..."
 
 # Environment variable'ları export et
 export PATH="$JAVA_HOME/bin:$PATH"
 export ANDROID_HOME="$ANDROID_HOME"
+
+# Android SDK platform-tools PATH'ini ekle (adb için)
+if [ -d "$ANDROID_HOME/platform-tools" ]; then
+    export PATH="$ANDROID_HOME/platform-tools:$PATH"
+fi
+
+# Clean işlemi
+./gradlew clean --no-daemon || {
+    echo "⚠️  Clean işlemi sırasında uyarı oluştu, devam ediliyor..."
+}
+
+echo "✅ Clean tamamlandı"
+
+# ==========================================
+# 8. Build İşlemi
+# ==========================================
+echo ""
+echo "🔨 Proje build ediliyor (dependencies + compile + APK)..."
 
 # Tek komutla tüm işlemleri yap: dependencies indir, derle, APK oluştur
 ./gradlew assembleDebug --no-daemon || {
@@ -290,8 +308,49 @@ echo "=========================================="
 echo ""
 echo "APK dosyası: build/outputs/apk/debug/EngelsizYasamAsistani-debug.apk"
 echo ""
-echo "Cihaza yüklemek için:"
-echo "  ./gradlew installDebug"
+
+# ==========================================
+# 9. Cihaza Yükleme (Opsiyonel)
+# ==========================================
+echo "📱 Cihaza yükleme işlemi..."
+echo ""
+
+# ADB cihaz kontrolü
+if command -v adb &> /dev/null; then
+    DEVICES=$(adb devices | grep -v "List of devices" | grep "device$" | wc -l | tr -d ' ')
+    
+    if [ "$DEVICES" -eq 0 ]; then
+        echo "⚠️  Bağlı cihaz bulunamadı!"
+        echo "   USB ile bağlı bir cihaz veya emulator bekleniyor..."
+        echo ""
+        echo "Cihaza manuel yüklemek için:"
+        echo "  adb install -r build/outputs/apk/debug/EngelsizYasamAsistani-debug.apk"
+    elif [ "$DEVICES" -eq 1 ]; then
+        DEVICE_ID=$(adb devices | grep "device$" | awk '{print $1}' | head -n 1)
+        echo "📱 Tek cihaz bulundu: $DEVICE_ID"
+        echo "🔄 Eski APK kaldırılıyor..."
+        adb -s "$DEVICE_ID" uninstall com.gormeengelliler.android 2>/dev/null || true
+        echo "📥 Yeni APK yükleniyor..."
+        adb -s "$DEVICE_ID" install -r build/outputs/apk/debug/EngelsizYasamAsistani-debug.apk && {
+            echo "✅ APK başarıyla yüklendi!"
+        } || {
+            echo "❌ APK yükleme hatası!"
+        }
+    else
+        echo "⚠️  Birden fazla cihaz bulundu!"
+        echo "   Cihazlar:"
+        adb devices | grep "device$" | awk '{print "     - " $1}'
+        echo ""
+        echo "Belirli bir cihaza yüklemek için:"
+        echo "  adb -s <DEVICE_ID> uninstall com.gormeengelliler.android"
+        echo "  adb -s <DEVICE_ID> install -r build/outputs/apk/debug/EngelsizYasamAsistani-debug.apk"
+    fi
+else
+    echo "⚠️  ADB bulunamadı! (Android SDK platform-tools)"
+    echo "   Cihaza manuel yüklemek için:"
+    echo "   adb install -r build/outputs/apk/debug/EngelsizYasamAsistani-debug.apk"
+fi
+
 echo ""
 echo "Tam build (lint dahil) için:"
 echo "  ./gradlew build"

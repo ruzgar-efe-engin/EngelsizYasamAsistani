@@ -37,23 +37,15 @@ class MenuManager(private val context: Context) {
         prefs.edit().putString(LANGUAGE_KEY, language).apply()
     }
     
-    fun getThemeName(themeIndex: Int): String? {
+    fun getMainMenuName(mainIndex: Int): String? {
         val structure = menuStructure ?: return null
-        val theme = structure.themes.find { it.id == themeIndex } ?: return null
-        return theme.name.get(getSelectedLanguage())
-    }
-    
-    fun getMainMenuName(themeIndex: Int, mainIndex: Int): String? {
-        val structure = menuStructure ?: return null
-        val theme = structure.themes.find { it.id == themeIndex } ?: return null
-        val mainMenu = theme.mainMenus.find { it.id == mainIndex } ?: return null
+        val mainMenu = structure.mainMenus.find { it.id == mainIndex } ?: return null
         return mainMenu.name.get(getSelectedLanguage())
     }
     
-    fun getSubMenuName(themeIndex: Int, mainIndex: Int, subIndex: Int): String? {
+    fun getSubMenuName(mainIndex: Int, subIndex: Int): String? {
         val structure = menuStructure ?: return null
-        val theme = structure.themes.find { it.id == themeIndex } ?: return null
-        val mainMenu = theme.mainMenus.find { it.id == mainIndex } ?: return null
+        val mainMenu = structure.mainMenus.find { it.id == mainIndex } ?: return null
         val subMenu = mainMenu.subMenus.find { it.id == subIndex } ?: return null
         return subMenu.name.get(getSelectedLanguage())
     }

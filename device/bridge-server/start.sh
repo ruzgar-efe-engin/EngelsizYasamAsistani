@@ -5,6 +5,13 @@
 
 set -e
 
+# Android SDK platform-tools PATH'ini ekle (adb için)
+if [ -d "$HOME/Library/Android/sdk/platform-tools" ]; then
+    export PATH="$HOME/Library/Android/sdk/platform-tools:$PATH"
+elif [ -d "$HOME/Android/Sdk/platform-tools" ]; then
+    export PATH="$HOME/Android/Sdk/platform-tools:$PATH"
+fi
+
 echo "=========================================="
 echo "Wokwi BLE Bridge Server - Başlatılıyor"
 echo "=========================================="

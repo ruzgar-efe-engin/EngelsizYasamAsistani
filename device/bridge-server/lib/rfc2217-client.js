@@ -119,7 +119,11 @@ class RFC2217Client {
                 
                 // Veri alındı
                 this.socket.on('data', (data) => {
-                    console.log(`📥 [RFC2217] Raw data alındı: ${data.length} bytes`);
+                    // Küçük chunk'ları log'lamayı azalt (spam önleme)
+                    // Sadece büyük chunk'ları veya önemli durumları log'la
+                    if (data.length > 20 || this.buffer.length === 0) {
+                        console.log(`📥 [RFC2217] Raw data alındı: ${data.length} bytes`);
+                    }
                     this.handleData(data);
                 });
                 
@@ -147,10 +151,16 @@ class RFC2217Client {
                 
                 // Bağlantı kapandı
                 this.socket.on('close', () => {
-                    console.warn(`⚠️  [RFC2217] TCP bağlantısı kapandı`);
+                    const wasConnected = this.isConnected;
                     this.isConnected = false;
-                    if (this.onDisconnectCallback) {
+                    
+                    // Sadece gerçekten bağlantı kurulduktan sonra kapanırsa onDisconnect çağır
+                    if (wasConnected && this.onDisconnectCallback) {
+                        console.warn(`⚠️  [RFC2217] TCP bağlantısı kapandı (bağlantı kesildi)`);
                         this.onDisconnectCallback();
+                    } else {
+                        // Bağlantı kurulamadı veya hiç bağlanılmadı
+                        console.warn(`⚠️  [RFC2217] TCP bağlantısı kapandı (bağlantı kurulamadı)`);
                     }
                     
                     // Auto-reconnect
@@ -203,7 +213,27 @@ class RFC2217Client {
             }
         }
         
-        const rawData = data.toString();
+        // RFC2217 protokolünde IAC (255) karakterlerini filtrele
+        // IAC karakterleri binary control karakterleridir ve string'e çevrilmemelidir
+        const filteredData = Buffer.from(data).filter(byte => byte !== 255 && byte !== 0);
+        
+        if (filteredData.length === 0) {
+            // Sadece IAC karakterleri varsa, bunları atla
+            return;
+        }
+        
+        // UTF-8 encoding ile string'e çevir (hata toleranslı)
+        let rawData;
+        try {
+            rawData = filteredData.toString('utf8');
+        } catch (error) {
+            // UTF-8 decode hatası - geçersiz karakterleri atla
+            rawData = filteredData.toString('utf8', 'replace');
+        }
+        
+        // Bozuk karakterleri temizle (control karakterleri, vb.)
+        rawData = rawData.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F-\x9F]/g, '');
+        
         this.buffer += rawData;
         
         // Satır satır işle
@@ -217,8 +247,20 @@ class RFC2217Client {
                 return;
             }
             
-            // TÜM satırları log'la
-            console.log(`📥 [RFC2217 Raw] (${trimmedLine.length} bytes) "${trimmedLine}"`);
+            // Bozuk/tekrarlayan karakterleri kontrol et
+            // Eğer satır çok fazla tekrarlayan karakter içeriyorsa, muhtemelen bozuk
+            const uniqueChars = new Set(trimmedLine.split('')).size;
+            const totalChars = trimmedLine.length;
+            if (totalChars > 50 && uniqueChars < 5) {
+                // Çok fazla tekrarlayan karakter var, muhtemelen bozuk data
+                console.log(`⚠️  [RFC2217] Bozuk data tespit edildi, atlanıyor: ${trimmedLine.substring(0, 50)}...`);
+                return;
+            }
+            
+            // Sadece [BLE] veya [SERIAL] prefix'li satırları log'la (spam önleme)
+            if (trimmedLine.includes('[BLE]') || trimmedLine.includes('[SERIAL]')) {
+                console.log(`📥 [RFC2217 Raw] (${trimmedLine.length} bytes) "${trimmedLine}"`);
+            }
             
             // Pairing mode mesajlarını kontrol et
             if (trimmedLine.includes('[BLE] Pairing mode aktif')) {
@@ -251,10 +293,8 @@ class RFC2217Client {
                 if (this.onDataCallback) {
                     this.onDataCallback(event, trimmedLine);
                 }
-            } else {
-                // [BLE] veya [SERIAL] prefix'i yoksa sadece log'la
-                console.log(`ℹ️  [RFC2217] Prefix yok, atlanıyor: ${trimmedLine}`);
             }
+            // [BLE] veya [SERIAL] prefix'i yoksa sessizce atla (log spam'i önleme)
         });
     }
 

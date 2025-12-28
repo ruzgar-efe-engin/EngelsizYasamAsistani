@@ -45,9 +45,11 @@ if "%ANDROID_HOME%"=="" (
     )
 )
 
+REM Android SDK platform-tools PATH'ini ekle (adb için)
 set PATH=%ANDROID_HOME%\emulator;%ANDROID_HOME%\tools;%ANDROID_HOME%\tools\bin;%ANDROID_HOME%\platform-tools;%PATH%
 
 echo [OK] ANDROID_HOME: %ANDROID_HOME%
+echo [OK] PATH'e platform-tools eklendi: %ANDROID_HOME%\platform-tools
 
 REM Emulator kontrolü
 if not exist "%ANDROID_HOME%\emulator\emulator.exe" (

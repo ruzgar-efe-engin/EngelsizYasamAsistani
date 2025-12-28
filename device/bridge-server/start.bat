@@ -2,6 +2,18 @@
 REM Wokwi BLE Bridge Server - Start Script (Windows)
 REM Bu script bridge server'ı başlatır ve gerekli kontrolleri yapar
 
+REM Android SDK platform-tools PATH'ini ekle (adb için)
+if "%ANDROID_HOME%"=="" (
+    if exist "%LOCALAPPDATA%\Android\Sdk\platform-tools" (
+        set ANDROID_HOME=%LOCALAPPDATA%\Android\Sdk
+    ) else if exist "%USERPROFILE%\AppData\Local\Android\Sdk\platform-tools" (
+        set ANDROID_HOME=%USERPROFILE%\AppData\Local\Android\Sdk
+    )
+)
+if not "%ANDROID_HOME%"=="" (
+    set PATH=%ANDROID_HOME%\platform-tools;%PATH%
+)
+
 echo ==========================================
 echo Wokwi BLE Bridge Server - Baslatiliyor
 echo ==========================================

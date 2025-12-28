@@ -32,9 +32,21 @@ class MainActivity : AppCompatActivity() {
         hasBluetoothPermissions = allGranted
         
         if (allGranted) {
-            // İzinler verildi, foreground service'i başlat
-            val serviceIntent = Intent(this, DeviceEventService::class.java)
-            startForegroundService(serviceIntent)
+            // İzinler verildi, foreground service'i başlat (permission'dan SONRA)
+            android.util.Log.d("MainActivity", "✅ Bluetooth izinleri verildi, foreground service başlatılıyor...")
+            try {
+                val serviceIntent = Intent(this, DeviceEventService::class.java)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(serviceIntent)
+                } else {
+                    startService(serviceIntent)
+                }
+                android.util.Log.d("MainActivity", "✅ Foreground service başlatıldı")
+            } catch (e: Exception) {
+                android.util.Log.e("MainActivity", "❌ Foreground service başlatma hatası: ${e.message}")
+            }
+        } else {
+            android.util.Log.w("MainActivity", "⚠️  Bluetooth izinleri reddedildi")
         }
     }
     
@@ -52,12 +64,12 @@ class MainActivity : AppCompatActivity() {
                 ) {
                     if (hasBluetoothPermissions) {
                         // İzinler verildi, SetupScreen'i göster
-                        SetupScreen(
-                            onSetupComplete = {
-                                // Setup tamamlandı, uygulamayı arka plana al
-                                moveTaskToBack(true)
-                            }
-                        )
+                    SetupScreen(
+                        onSetupComplete = {
+                            // Setup tamamlandı, uygulamayı arka plana al
+                            moveTaskToBack(true)
+                        }
+                    )
                     } else {
                         // İzin ekranı
                         PermissionRequestScreen(
@@ -90,9 +102,19 @@ class MainActivity : AppCompatActivity() {
         }
         
         if (hasBluetoothPermissions) {
-            // İzinler zaten var, foreground service'i başlat
-            val serviceIntent = Intent(this, DeviceEventService::class.java)
-            startForegroundService(serviceIntent)
+            // İzinler zaten var, foreground service'i başlat (permission check'ten SONRA)
+            android.util.Log.d("MainActivity", "✅ Bluetooth izinleri mevcut, foreground service başlatılıyor...")
+            try {
+                val serviceIntent = Intent(this, DeviceEventService::class.java)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(serviceIntent)
+                } else {
+                    startService(serviceIntent)
+                }
+                android.util.Log.d("MainActivity", "✅ Foreground service başlatıldı")
+            } catch (e: Exception) {
+                android.util.Log.e("MainActivity", "❌ Foreground service başlatma hatası: ${e.message}")
+            }
         }
     }
     
@@ -107,8 +129,14 @@ class MainActivity : AppCompatActivity() {
         } else {
             // Android 12 öncesi için izin gerekmez
             hasBluetoothPermissions = true
-            val serviceIntent = Intent(this, DeviceEventService::class.java)
-            startForegroundService(serviceIntent)
+            android.util.Log.d("MainActivity", "✅ Android 12 öncesi - izin gerekmez, foreground service başlatılıyor...")
+            try {
+                val serviceIntent = Intent(this, DeviceEventService::class.java)
+                startService(serviceIntent) // Android 12 öncesi için startService yeterli
+                android.util.Log.d("MainActivity", "✅ Foreground service başlatıldı")
+            } catch (e: Exception) {
+                android.util.Log.e("MainActivity", "❌ Foreground service başlatma hatası: ${e.message}")
+            }
         }
     }
 }

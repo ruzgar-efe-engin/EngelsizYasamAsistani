@@ -21,54 +21,54 @@ class ConfirmHandler(
     private val apiClient = APIClient(context)
     
     // Generic confirm method - KRİTİK
-    fun confirm(themeIndex: Int, mainIndex: Int, subIndex: Int) {
+    fun confirm(mainIndex: Int, subIndex: Int) {
         scope.launch {
             // Mevcut TTS'i anında kes
             ttsManager.stop()
             
             // İşlem başlarken "yapılıyor" mesajı TTS
-            val processingMessage = getProcessingMessage(themeIndex, mainIndex, subIndex)
+            val processingMessage = getProcessingMessage(mainIndex, subIndex)
             ttsManager.speak(processingMessage)
             
             // İşlem tipine göre routing
             when {
-                // Tema 1 (Saat & Zaman) - Saat Bilgisi
-                themeIndex == 1 && mainIndex == 0 && subIndex == 0 -> {
+                // Saat Bilgisi
+                mainIndex == 0 && subIndex == 0 -> {
                     handleTimeRequest()
                 }
-                // Tema 1 (Saat & Zaman) - Tarih Bilgisi
-                themeIndex == 1 && mainIndex == 0 && subIndex == 1 -> {
+                // Tarih Bilgisi
+                mainIndex == 0 && subIndex == 1 -> {
                     handleDateRequest()
                 }
-                // Tema 0 (Ulaşım) - Şoföre Bildir
-                themeIndex == 0 && mainIndex == 2 && subIndex == 3 -> {
+                // Şoföre Bildir
+                mainIndex == 2 && subIndex == 3 -> {
                     handleDriverNotification()
                 }
-                // Tema 2 (Hava Durumu) - Bugün Sıcaklık
-                themeIndex == 2 && mainIndex == 0 && subIndex == 0 -> {
+                // Bugün Sıcaklık
+                mainIndex == 0 && subIndex == 0 -> {
                     handleWeatherRequest(day = "today", type = "temperature")
                 }
-                // Tema 2 (Hava Durumu) - Bugün Hava Durumu
-                themeIndex == 2 && mainIndex == 0 && subIndex == 1 -> {
+                // Bugün Hava Durumu
+                mainIndex == 0 && subIndex == 1 -> {
                     handleWeatherRequest(day = "today", type = "condition")
                 }
-                // Tema 2 (Hava Durumu) - Yarın Sıcaklık
-                themeIndex == 2 && mainIndex == 1 && subIndex == 0 -> {
+                // Yarın Sıcaklık
+                mainIndex == 1 && subIndex == 0 -> {
                     handleWeatherRequest(day = "tomorrow", type = "temperature")
                 }
-                // Tema 2 (Hava Durumu) - Yarın Hava Durumu
-                themeIndex == 2 && mainIndex == 1 && subIndex == 1 -> {
+                // Yarın Hava Durumu
+                mainIndex == 1 && subIndex == 1 -> {
                     handleWeatherRequest(day = "tomorrow", type = "condition")
                 }
                 // Diğer işlemler için genel handler
                 else -> {
-                    handleGenericAction(themeIndex, mainIndex, subIndex)
+                    handleGenericAction(mainIndex, subIndex)
                 }
             }
         }
     }
     
-    private fun getProcessingMessage(themeIndex: Int, mainIndex: Int, subIndex: Int): String {
+    private fun getProcessingMessage(mainIndex: Int, subIndex: Int): String {
         val language = menuManager.getSelectedLanguage()
         return when (language) {
             "tr" -> "İşlem yapılıyor..."
@@ -158,7 +158,7 @@ class ConfirmHandler(
         ttsManager.speak(message)
     }
     
-    private suspend fun handleGenericAction(themeIndex: Int, mainIndex: Int, subIndex: Int) {
+    private suspend fun handleGenericAction(mainIndex: Int, subIndex: Int) {
         val language = menuManager.getSelectedLanguage()
         val message = when (language) {
             "tr" -> "Bu özellik yakında eklenecek"

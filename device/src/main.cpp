@@ -20,6 +20,8 @@
 
 #include <Arduino.h>
 #include "EventTransport.h"
+#include "pins.h"
+
 #ifdef TRANSPORT_BLE
 #include <BLEDevice.h>
 #endif
@@ -36,36 +38,7 @@
 #define TRANSPORT_SERIAL  // Wokwi / Simülasyon için
 // #define TRANSPORT_BLE   // Gerçek cihaz için
 
-/* ============================================================================
- * PIN DEFINITIONS (Pin Tanımlamaları)
- * ============================================================================
- * 
- * ESP32-S3 Seeed Studio XIAO board'unda kullanılan pin'ler.
- * Her encoder 2 pin kullanır (CLK ve DT), butonlar tek pin.
- * 
- * Encoder Pins:
- * - CLK (Clock): Ana sinyal pini, dönüş yönünü belirlemek için kullanılır
- * - DT (Data): Yön bilgisi pini, CLK ile birlikte okunarak yön tespit edilir
- * 
- * Button Pins:
- * - Pull-up resistor kullanılır (INPUT_PULLUP)
- * - Basılıyken LOW, basılı değilken HIGH okunur
- */
 
-// Main Menu Encoder (Ana Menü Seçimi) - İkinci seviye menü
-#define PIN_MAIN_CLK  D2  // Clock pin
-#define PIN_MAIN_DT   D3  // Data pin
-
-// Sub Menu Encoder (Alt Menü Seçimi) - Üçüncü seviye menü
-#define PIN_SUB_CLK   D4  // Clock pin
-#define PIN_SUB_DT    D5  // Data pin
-#define PIN_SUB_SW    D6  // Switch (buton) - encoder üzerindeki basma butonu
-
-// Buttons (Butonlar)
-#define PIN_AI        D9  // AI butonu (basılı tutma için)
-
-// LED (Geri Bildirim)
-#define PIN_LED       D10 // LED pin (gelecekte titreşim motoru olabilir)
 
 /* ============================================================================
  * POZISYON DEGISKENLERI (Position Variables)
