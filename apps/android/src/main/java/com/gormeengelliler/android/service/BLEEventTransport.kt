@@ -87,6 +87,11 @@ class BLEEventTransport(private val context: Context) : EventTransport {
     private val POLLING_INTERVAL_MS = 50L // 50ms'de bir read yap (optimize edildi - daha hızlı event alımı)
     private var lastReadValue: ByteArray? = null // Son okunan değer (duplicate event'leri engellemek için)
     
+    // Paket birleştirme mekanizması (BLE paket bölünmesi için)
+    private var packetBuffer: StringBuilder = StringBuilder()
+    private val PACKET_BUFFER_TIMEOUT_MS = 100L // 100ms içinde tamamlanmazsa buffer'ı temizle
+    private var packetBufferTimeoutHandler: Handler? = null
+    
     // EventTransport interface callbacks
     override var onDeviceFound: ((String) -> Unit)? = null
     override var onEventReceived: ((String) -> Unit)? = null
@@ -449,7 +454,25 @@ class BLEEventTransport(private val context: Context) : EventTransport {
                 if (newState == BluetoothProfile.STATE_CONNECTED) {
                     // CONNECTED demek için erken: önce service discovery + notify subscribe başarıyla tamamlanmalı
                     isNotificationReady = false
-                    android.util.Log.d("BLEEventTransport", "✅ Cihaz bağlandı, service'ler keşfediliyor...")
+                    android.util.Log.d("BLEEventTransport", "✅ Cihaz bağlandı, MTU artırılıyor ve service'ler keşfediliyor...")
+                    
+                    // MTU size'ı artır (paket bölünmesini önlemek için)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            if (ActivityCompat.checkSelfPermission(
+                                    context,
+                                    Manifest.permission.BLUETOOTH_CONNECT
+                                ) == PackageManager.PERMISSION_GRANTED
+                            ) {
+                                val mtuRequested = gatt.requestMtu(512) // 512 byte MTU (default 23 byte)
+                                android.util.Log.d("BLEEventTransport", "   📡 MTU request gönderildi: $mtuRequested (512 byte isteniyor)")
+                            }
+                        } else {
+                            val mtuRequested = gatt.requestMtu(512)
+                            android.util.Log.d("BLEEventTransport", "   📡 MTU request gönderildi: $mtuRequested (512 byte isteniyor)")
+                        }
+                    }
+                    
                     // Service'leri keşfet
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         if (ActivityCompat.checkSelfPermission(
@@ -465,6 +488,9 @@ class BLEEventTransport(private val context: Context) : EventTransport {
                 } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                     android.util.Log.d("BLEEventTransport", "⚠️ Cihaz bağlantısı kesildi")
                     isNotificationReady = false
+                    // Paket buffer'ı temizle
+                    packetBuffer.clear()
+                    packetBufferTimeoutHandler?.removeCallbacksAndMessages(null)
                     onConnectionStateChanged?.invoke(false)
                 }
                 
@@ -475,6 +501,21 @@ class BLEEventTransport(private val context: Context) : EventTransport {
                 }
                 // CONNECTED durumu notify hazır olunca yayınlanacak
             }
+        }
+        
+        override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
+            android.util.Log.d("BLEEventTransport", "\n📡📡📡 ========================================")
+            android.util.Log.d("BLEEventTransport", "📡 onMtuChanged CALLBACK TETİKLENDİ!")
+            android.util.Log.d("BLEEventTransport", "========================================")
+            android.util.Log.d("BLEEventTransport", "   MTU: $mtu bytes")
+            android.util.Log.d("BLEEventTransport", "   Status: $status")
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                android.util.Log.d("BLEEventTransport", "   ✅ MTU başarıyla değiştirildi: $mtu bytes")
+                android.util.Log.d("BLEEventTransport", "   💡 Paket bölünmesi azalacak")
+            } else {
+                android.util.Log.w("BLEEventTransport", "   ⚠️ MTU değiştirilemedi, default MTU kullanılacak")
+            }
+            android.util.Log.d("BLEEventTransport", "========================================\n")
         }
         
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
@@ -915,43 +956,78 @@ class BLEEventTransport(private val context: Context) : EventTransport {
 
         if (value != null && value.isNotEmpty()) {
             val jsonString = String(value, Charsets.UTF_8)
-            android.util.Log.d("BLEEventTransport", "✅ Event alındı (BLE): $jsonString")
-            android.util.Log.d("BLEEventTransport", "   JSON string uzunluğu: ${jsonString.length} karakter")
-            android.util.Log.d("BLEEventTransport", "   JSON string (ilk 100 karakter): ${jsonString.take(100)}")
+            android.util.Log.d("BLEEventTransport", "✅ Event paketi alındı (BLE): $jsonString")
+            android.util.Log.d("BLEEventTransport", "   Paket uzunluğu: ${jsonString.length} karakter")
+            android.util.Log.d("BLEEventTransport", "   Paket içeriği (ilk 100 karakter): ${jsonString.take(100)}")
             
-            // Event alındı - subscribe başarılı demektir
-            val eventReceivedTime = System.currentTimeMillis()
-            lastEventReceivedTime = eventReceivedTime
-            subscribeVerificationHandler?.removeCallbacksAndMessages(null) // Verification timeout'u iptal et
-            android.util.Log.d("BLEEventTransport", "   ✅ Subscribe verification başarılı - event alındı!")
-            android.util.Log.d("BLEEventTransport", "   Event alınma zamanı: $eventReceivedTime")
-            android.util.Log.d("BLEEventTransport", "   💡 sendEvent çağrıldı: type=X m=Y s=Z - Paket alındı")
+            // Paket birleştirme mekanizması - Buffer timeout'unu iptal et
+            packetBufferTimeoutHandler?.removeCallbacksAndMessages(null)
             
-            // onEventReceived callback'inin set edilip edilmediğini kontrol et
-            if (onEventReceived == null) {
-                android.util.Log.e("BLEEventTransport", "   ❌ KRİTİK: onEventReceived callback NULL!")
-                android.util.Log.e("BLEEventTransport", "   ⚠️  Event alındı ama callback yok, event kaybolacak!")
-                android.util.Log.e("BLEEventTransport", "   💡 SetupScreen'de onEventReceived callback'i set edilmeli")
-                return
+            // Buffer'a ekle
+            packetBuffer.append(jsonString)
+            val combinedJson = packetBuffer.toString()
+            android.util.Log.d("BLEEventTransport", "   📦 Buffer'a eklendi, toplam uzunluk: ${combinedJson.length} karakter")
+            
+            // JSON validation - Tam JSON mu kontrol et
+            val isCompleteJson = try {
+                // JSON'un başında { ve sonunda } veya \n var mı kontrol et
+                val trimmed = combinedJson.trim()
+                trimmed.startsWith("{") && (trimmed.endsWith("}") || trimmed.endsWith("}\n"))
+            } catch (e: Exception) {
+                false
             }
             
-            // Callback'i main thread'de çağır - UI güncellemeleri için gerekli
-            android.util.Log.d("BLEEventTransport", "   📤 Event callback main thread'e gönderiliyor...")
-            android.util.Log.d("BLEEventTransport", "   📤 onEventReceived callback çağrılacak: $jsonString")
-            mainHandler.post {
-                try {
-                    val callbackTimestamp = System.currentTimeMillis()
-                    android.util.Log.d("BLEEventTransport", "   ✅ onEventReceived callback çağrılıyor (main thread)")
-                    android.util.Log.d("BLEEventTransport", "   Callback timestamp: $callbackTimestamp")
-                    android.util.Log.d("BLEEventTransport", "   📥 Main thread'de event callback çağrılıyor (timestamp: $callbackTimestamp)")
-                    onEventReceived?.invoke(jsonString)
-                    android.util.Log.d("BLEEventTransport", "   ✅ Event callback çağrıldı (main thread)")
-                    android.util.Log.d("BLEEventTransport", "   💡 SetupScreen.onEventReceived tetiklenmeli")
-                } catch (e: Exception) {
-                    android.util.Log.e("BLEEventTransport", "   ❌ Event callback exception: ${e.message}")
-                    android.util.Log.e("BLEEventTransport", "   Exception tipi: ${e.javaClass.simpleName}")
-                    android.util.Log.e("BLEEventTransport", "   Stack: ${e.stackTrace.take(5).joinToString("\n")}")
+            if (isCompleteJson) {
+                // Tam JSON - Buffer'ı temizle ve event'i gönder
+                android.util.Log.d("BLEEventTransport", "   ✅ Tam JSON tespit edildi, event gönderiliyor")
+                packetBuffer.clear()
+                
+                // Event alındı - subscribe başarılı demektir
+                val eventReceivedTime = System.currentTimeMillis()
+                lastEventReceivedTime = eventReceivedTime
+                subscribeVerificationHandler?.removeCallbacksAndMessages(null) // Verification timeout'u iptal et
+                android.util.Log.d("BLEEventTransport", "   ✅ Subscribe verification başarılı - event alındı!")
+                android.util.Log.d("BLEEventTransport", "   Event alınma zamanı: $eventReceivedTime")
+                android.util.Log.d("BLEEventTransport", "   💡 sendEvent çağrıldı: type=X m=Y s=Z - Paket alındı")
+                
+                // onEventReceived callback'inin set edilip edilmediğini kontrol et
+                if (onEventReceived == null) {
+                    android.util.Log.e("BLEEventTransport", "   ❌ KRİTİK: onEventReceived callback NULL!")
+                    android.util.Log.e("BLEEventTransport", "   ⚠️  Event alındı ama callback yok, event kaybolacak!")
+                    android.util.Log.e("BLEEventTransport", "   💡 SetupScreen'de onEventReceived callback'i set edilmeli")
+                    return
                 }
+                
+                // Callback'i main thread'de çağır - UI güncellemeleri için gerekli
+                android.util.Log.d("BLEEventTransport", "   📤 Event callback main thread'e gönderiliyor...")
+                android.util.Log.d("BLEEventTransport", "   📤 onEventReceived callback çağrılacak: $combinedJson")
+                mainHandler.post {
+                    try {
+                        val callbackTimestamp = System.currentTimeMillis()
+                        android.util.Log.d("BLEEventTransport", "   ✅ onEventReceived callback çağrılıyor (main thread)")
+                        android.util.Log.d("BLEEventTransport", "   Callback timestamp: $callbackTimestamp")
+                        android.util.Log.d("BLEEventTransport", "   📥 Main thread'de event callback çağrılıyor (timestamp: $callbackTimestamp)")
+                        onEventReceived?.invoke(combinedJson.trim())
+                        android.util.Log.d("BLEEventTransport", "   ✅ Event callback çağrıldı (main thread)")
+                        android.util.Log.d("BLEEventTransport", "   💡 SetupScreen.onEventReceived tetiklenmeli")
+                    } catch (e: Exception) {
+                        android.util.Log.e("BLEEventTransport", "   ❌ Event callback exception: ${e.message}")
+                        android.util.Log.e("BLEEventTransport", "   Exception tipi: ${e.javaClass.simpleName}")
+                        android.util.Log.e("BLEEventTransport", "   Stack: ${e.stackTrace.take(5).joinToString("\n")}")
+                    }
+                }
+            } else {
+                // Eksik JSON - Buffer'da tut ve bir sonraki paketi bekle
+                android.util.Log.w("BLEEventTransport", "   ⚠️ Eksik JSON tespit edildi, buffer'da tutuluyor")
+                android.util.Log.w("BLEEventTransport", "   Buffer içeriği: $combinedJson")
+                
+                // Timeout ekle - 100ms içinde tamamlanmazsa buffer'ı temizle
+                packetBufferTimeoutHandler = Handler(Looper.getMainLooper())
+                packetBufferTimeoutHandler?.postDelayed({
+                    android.util.Log.w("BLEEventTransport", "   ⏰ Paket buffer timeout - buffer temizleniyor")
+                    android.util.Log.w("BLEEventTransport", "   Kayıp paket: ${packetBuffer.toString()}")
+                    packetBuffer.clear()
+                }, PACKET_BUFFER_TIMEOUT_MS)
             }
         } else {
             android.util.Log.w("BLEEventTransport", "⚠️ Event value boş veya null")

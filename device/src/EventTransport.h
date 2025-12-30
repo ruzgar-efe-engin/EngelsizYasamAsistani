@@ -181,23 +181,28 @@ public:
     delay(30);
     digitalWrite(_ledPin, LOW);
 
-    // Event'i JSON formatında hazırla
-    String json = "{";
-    json += "\"type\":" + String(event.type) + ",";
-    json += "\"mainIndex\":" + String(event.mainIndex) + ",";
-    json += "\"subIndex\":" + String(event.subIndex) + ",";
-    json += "\"ts\":" + String(event.ts);
-    json += "}";
+    // Event'i JSON formatında hazırla (güvenli string oluşturma)
+    char jsonBuffer[128];
+    snprintf(jsonBuffer, sizeof(jsonBuffer), 
+             "{\"type\":%d,\"mainIndex\":%d,\"subIndex\":%d,\"ts\":%lu}\n",
+             event.type, event.mainIndex, event.subIndex, event.ts);
+    String json = String(jsonBuffer);
+    
+    // Gönderim öncesi delay (paket bütünlüğü için - MTU değişikliği için zaman tanı)
+    delay(10);
     
     // BLE'ye gönder (eğer bağlıysa)
     if (_deviceConnected) {
+      // JSON'un tamamını tek seferde gönder
       _pCharacteristic->setValue(json.c_str());
       _pCharacteristic->notify();
+      // Gönderim sonrası delay (paket bütünlüğü için - bir sonraki event için hazır ol)
+      delay(10);
     }
     
-    // Serial'e de logla (debug için)
+    // Serial'e de logla (debug için - tam JSON)
     Serial.print("[BLE] ");
-    Serial.println(json);
+    Serial.print(json);
   }
   
   void setDeviceConnected(bool connected) {

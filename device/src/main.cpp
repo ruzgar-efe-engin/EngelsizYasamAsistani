@@ -85,7 +85,7 @@ class Encoder {
 public:
   // Constructor: Encoder pin'lerini ve başlangıç durumlarını ayarlar
   Encoder(uint8_t clk, uint8_t dt)
-    : _clk(clk), _dt(dt), _lastClk(HIGH), _lastDt(HIGH) {}
+    : _clk(clk), _dt(dt), _lastClk(HIGH), _lastDt(HIGH), _lastReadTime(0) {}
 
   // begin(): Pin'leri INPUT_PULLUP olarak ayarlar ve başlangıç durumunu okur
   void begin() {
@@ -94,11 +94,24 @@ public:
     delay(10);                     // Pin'lerin stabilize olması için bekle
     _lastClk = digitalRead(_clk);  // Başlangıç CLK durumunu kaydet
     _lastDt = digitalRead(_dt);    // Başlangıç DT durumunu kaydet
+    _lastReadTime = millis();      // Başlangıç zamanını kaydet
   }
 
   // readStep(): Encoder'ın bir adım döndüğünü tespit eder
   // Return: +1 (saat yönü), -1 (ters yön), 0 (dönüş yok)
   int8_t readStep() {
+    uint32_t now = millis();
+    
+    // Debounce: Çok hızlı ardışık okumaları filtrele
+    if (now - _lastReadTime < ENCODER_DEBOUNCE_MS) {
+      // Henüz debounce süresi geçmedi, sadece durumları güncelle
+      uint8_t clk = digitalRead(_clk);
+      uint8_t dt = digitalRead(_dt);
+      _lastClk = clk;
+      _lastDt = dt;
+      return 0;  // Dönüş yok
+    }
+    
     uint8_t clk = digitalRead(_clk);  // CLK pin'inin şu anki durumu
     uint8_t dt = digitalRead(_dt);    // DT pin'inin şu anki durumu
     
@@ -109,11 +122,13 @@ public:
         // DT = HIGH → Saat yönünde dönüş
         _lastClk = clk;  // Durumu güncelle
         _lastDt = dt;
+        _lastReadTime = now;  // Okuma zamanını güncelle
         return +1;  // Clockwise (saat yönü)
       } else {
         // DT = LOW → Saat yönü tersine dönüş
         _lastClk = clk;  // Durumu güncelle
         _lastDt = dt;
+        _lastReadTime = now;  // Okuma zamanını güncelle
         return -1;  // Counter-clockwise (ters yön)
       }
     }
@@ -127,6 +142,8 @@ public:
 private:
   uint8_t _clk, _dt;        // CLK ve DT pin numaraları
   uint8_t _lastClk, _lastDt; // Önceki okuma durumları (edge detection için)
+  uint32_t _lastReadTime;   // Son okuma zamanı (debounce için)
+  static const uint32_t ENCODER_DEBOUNCE_MS = 50;  // Encoder debounce süresi (50ms)
 };
 
 // Encoder nesnelerini oluştur (her encoder için bir instance)
@@ -244,6 +261,11 @@ static const uint32_t BUTTON_RELEASE_DEBOUNCE_MS = 100; // Buton bırakıldıkta
 static uint32_t aiPressStartTime = 0;       // AI butonu basılı tutma başlangıç zamanı
 static const uint32_t LONG_PRESS_MS = 5000; // 5 saniye basılı tutma süresi
 
+// Encoder event gönderimi için rate limiting
+static uint32_t lastMainRotateTime = 0;     // Son ana menü rotate event zamanı
+static uint32_t lastSubRotateTime = 0;      // Son alt menü rotate event zamanı
+static const uint32_t EVENT_RATE_LIMIT_MS = 100; // Minimum event gönderim aralığı (100ms)
+
 /* ============================================================================
  * LOOP() - Ana Döngü Fonksiyonu
  * ============================================================================
@@ -288,18 +310,28 @@ void loop() {
 
   // Ana Menü Encoder döndü mü?
   if (dMain != 0) {
-    mainIndex += dMain;  // Pozisyonu güncelle (+1 veya -1)
-    // Ana menü değiştiğinde alt menüyü sıfırla
-    subIndex = 0;  // Alt menü sıfırla
-    // Event gönder: Ana menü değişti
-    sendEvent(MAIN_ROTATE, mainIndex);
+    uint32_t now = millis();
+    // Rate limiting: Çok hızlı event gönderimini önle
+    if (now - lastMainRotateTime >= EVENT_RATE_LIMIT_MS) {
+      mainIndex += dMain;  // Pozisyonu güncelle (+1 veya -1)
+      // Ana menü değiştiğinde alt menüyü sıfırla
+      subIndex = 0;  // Alt menü sıfırla
+      // Event gönder: Ana menü değişti
+      sendEvent(MAIN_ROTATE, mainIndex);
+      lastMainRotateTime = now;  // Son event zamanını güncelle
+    }
   }
 
   // Alt Menü Encoder döndü mü?
   if (dSub != 0) {
-    subIndex += dSub;  // Pozisyonu güncelle (+1 veya -1)
-    // Event gönder: Alt menü değişti
-    sendEvent(SUB_ROTATE, mainIndex, subIndex);
+    uint32_t now = millis();
+    // Rate limiting: Çok hızlı event gönderimini önle
+    if (now - lastSubRotateTime >= EVENT_RATE_LIMIT_MS) {
+      subIndex += dSub;  // Pozisyonu güncelle (+1 veya -1)
+      // Event gönder: Alt menü değişti
+      sendEvent(SUB_ROTATE, mainIndex, subIndex);
+      lastSubRotateTime = now;  // Son event zamanını güncelle
+    }
   }
 
   // ========================================================================
