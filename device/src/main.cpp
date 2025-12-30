@@ -19,14 +19,6 @@
  */
 
 #include <Arduino.h>
-#include "EventTransport.h"
-#include "pin.h"
-
-
-
-#ifdef TRANSPORT_BLE
-#include <BLEDevice.h>
-#endif
 
 /* ============================================================================
  * TRANSPORT SELECTION (Event Gönderme Yöntemi)
@@ -36,9 +28,17 @@
  * TRANSPORT_BLE: Gerçek cihaz için BLE (Bluetooth Low Energy) ile gönderim, BLE teknolojisi sayesinde enerji tüketimi daha azdır. Cihaz desteklenirse BLE kullanılabilir.
  * 
  * Not: Aynı anda sadece biri aktif olmalı. Diğerini yorum satırı yapın.
+ * ÖNEMLİ: TRANSPORT_BLE tanımı EventTransport.h include edilmeden ÖNCE olmalı!
  */
 /// #define TRANSPORT_SERIAL  // Wokwi / Simülasyon için
 #define TRANSPORT_BLE   // Gerçek cihaz için
+
+#include "EventTransport.h"
+#include "pin.h"
+
+#ifdef TRANSPORT_BLE
+#include <BLEDevice.h>
+#endif
 
 
 

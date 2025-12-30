@@ -263,10 +263,11 @@ public:
     BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
     pAdvertising->addServiceUUID(SERVICE_UUID);
     pAdvertising->setScanResponse(true);  // Scan response aktif (daha iyi keşif)
-    pAdvertising->setMinPreferred(0x06);  // Daha sık advertising
-    pAdvertising->setMaxPreferred(0x12);
+    pAdvertising->setMinPreferred(0x0006);  // Min interval (7.5ms) - daha sık advertising
+    pAdvertising->setMaxPreferred(0x0012);  // Max interval (20ms)
     BLEDevice::startAdvertising();
     Serial.println("[BLE] Advertising başlatıldı - Arama modu aktif");
+    Serial.println("[BLE] Device Name: GormeEngellilerKumanda (BLEDevice::init ile ayarlandı)");
     Serial.println("[BLE] LED yanıp sönmeye başlayacak (bağlantı yoksa)");
   }
   
