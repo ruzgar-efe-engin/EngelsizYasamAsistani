@@ -92,6 +92,13 @@ class BLEEventTransport(private val context: Context) : EventTransport {
     private val PACKET_BUFFER_TIMEOUT_MS = 100L // 100ms içinde tamamlanmazsa buffer'ı temizle
     private var packetBufferTimeoutHandler: Handler? = null
     
+    // Duplicate event kontrolü (aynı komutu tekrar göndermeyi önlemek için)
+    private var lastSentEventType: String? = null
+    private var lastSentEventMainIndex: Int = -1
+    private var lastSentEventSubIndex: Int = -1
+    private var lastSentEventTime: Long = 0
+    private val DUPLICATE_COMMAND_THRESHOLD_MS = 2000L // 2 saniye içinde aynı komut tekrar gelirse duplicate say
+    
     // EventTransport interface callbacks
     override var onDeviceFound: ((String) -> Unit)? = null
     override var onEventReceived: ((String) -> Unit)? = null
@@ -488,9 +495,13 @@ class BLEEventTransport(private val context: Context) : EventTransport {
                 } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                     android.util.Log.d("BLEEventTransport", "⚠️ Cihaz bağlantısı kesildi")
                     isNotificationReady = false
-                    // Paket buffer'ı temizle
+                    // Paket buffer'ı ve duplicate kontrol değişkenlerini temizle
                     packetBuffer.clear()
                     packetBufferTimeoutHandler?.removeCallbacksAndMessages(null)
+                    lastSentEventType = null
+                    lastSentEventMainIndex = -1
+                    lastSentEventSubIndex = -1
+                    lastSentEventTime = 0
                     onConnectionStateChanged?.invoke(false)
                 }
                 
@@ -978,8 +989,39 @@ class BLEEventTransport(private val context: Context) : EventTransport {
             }
             
             if (isCompleteJson) {
-                // Tam JSON - Buffer'ı temizle ve event'i gönder
-                android.util.Log.d("BLEEventTransport", "   ✅ Tam JSON tespit edildi, event gönderiliyor")
+                // Tam JSON - Duplicate komut kontrolü yap
+                val trimmedJson = combinedJson.trim()
+                val now = System.currentTimeMillis()
+                
+                // Event'i parse et ve komut bilgilerini çıkar
+                val event = com.gormeengelliler.android.model.DeviceEvent.fromJson(trimmedJson)
+                
+                if (event != null) {
+                    // Aynı komut (type + mainIndex + subIndex) ve 2 saniye içinde gelmişse duplicate say
+                    val isDuplicateCommand = lastSentEventType == event.type.name &&
+                                            lastSentEventMainIndex == event.mainIndex &&
+                                            lastSentEventSubIndex == event.subIndex &&
+                                            (now - lastSentEventTime) < DUPLICATE_COMMAND_THRESHOLD_MS
+                    
+                    if (isDuplicateCommand) {
+                        android.util.Log.w("BLEEventTransport", "   ⚠️ Duplicate komut tespit edildi (2 saniye içinde), atlanıyor")
+                        android.util.Log.w("BLEEventTransport", "   Son gönderilen: type=${lastSentEventType}, m=${lastSentEventMainIndex}, s=${lastSentEventSubIndex}")
+                        android.util.Log.w("BLEEventTransport", "   Yeni gelen: type=${event.type.name}, m=${event.mainIndex}, s=${event.subIndex}")
+                        android.util.Log.w("BLEEventTransport", "   Geçen süre: ${now - lastSentEventTime}ms")
+                        // Buffer'ı temizle ama event'i gönderme
+                        packetBuffer.clear()
+                        return
+                    }
+                    
+                    // Son gönderilen komutu kaydet
+                    lastSentEventType = event.type.name
+                    lastSentEventMainIndex = event.mainIndex
+                    lastSentEventSubIndex = event.subIndex
+                    lastSentEventTime = now
+                }
+                
+                // Buffer'ı temizle ve event'i gönder
+                android.util.Log.d("BLEEventTransport", "   ✅ Tam JSON tespit edildi, duplicate değil, event gönderiliyor")
                 packetBuffer.clear()
                 
                 // Event alındı - subscribe başarılı demektir
@@ -1000,14 +1042,14 @@ class BLEEventTransport(private val context: Context) : EventTransport {
                 
                 // Callback'i main thread'de çağır - UI güncellemeleri için gerekli
                 android.util.Log.d("BLEEventTransport", "   📤 Event callback main thread'e gönderiliyor...")
-                android.util.Log.d("BLEEventTransport", "   📤 onEventReceived callback çağrılacak: $combinedJson")
+                android.util.Log.d("BLEEventTransport", "   📤 onEventReceived callback çağrılacak: $trimmedJson")
                 mainHandler.post {
                     try {
                         val callbackTimestamp = System.currentTimeMillis()
                         android.util.Log.d("BLEEventTransport", "   ✅ onEventReceived callback çağrılıyor (main thread)")
                         android.util.Log.d("BLEEventTransport", "   Callback timestamp: $callbackTimestamp")
                         android.util.Log.d("BLEEventTransport", "   📥 Main thread'de event callback çağrılıyor (timestamp: $callbackTimestamp)")
-                        onEventReceived?.invoke(combinedJson.trim())
+                        onEventReceived?.invoke(trimmedJson)
                         android.util.Log.d("BLEEventTransport", "   ✅ Event callback çağrıldı (main thread)")
                         android.util.Log.d("BLEEventTransport", "   💡 SetupScreen.onEventReceived tetiklenmeli")
                     } catch (e: Exception) {
@@ -1027,6 +1069,11 @@ class BLEEventTransport(private val context: Context) : EventTransport {
                     android.util.Log.w("BLEEventTransport", "   ⏰ Paket buffer timeout - buffer temizleniyor")
                     android.util.Log.w("BLEEventTransport", "   Kayıp paket: ${packetBuffer.toString()}")
                     packetBuffer.clear()
+                    // Duplicate kontrol değişkenlerini de temizle
+                    lastSentEventType = null
+                    lastSentEventMainIndex = -1
+                    lastSentEventSubIndex = -1
+                    lastSentEventTime = 0
                 }, PACKET_BUFFER_TIMEOUT_MS)
             }
         } else {
