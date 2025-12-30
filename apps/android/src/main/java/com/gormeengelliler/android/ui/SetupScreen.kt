@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.gormeengelliler.android.manager.MenuManager
+import com.gormeengelliler.android.manager.EventLogManager
 import com.gormeengelliler.android.model.DeviceEvent
 import com.gormeengelliler.android.service.EventTransportProvider
 import com.gormeengelliler.android.service.TransportType
@@ -94,7 +95,18 @@ fun SetupScreen(
     
     // Event log state
     var eventLogs by remember { mutableStateOf<List<String>>(emptyList()) }
-    val maxLogEntries = 100
+    val maxLogEntries = 200 // TTS/STT logları için artırıldı
+    
+    // EventLogManager listener - TTS ve STT loglarını event log'a ekle
+    DisposableEffect(Unit) {
+        val listener: (String) -> Unit = { logLine ->
+            eventLogs = (eventLogs + logLine).takeLast(maxLogEntries)
+        }
+        EventLogManager.addListener(listener)
+        onDispose {
+            EventLogManager.removeListener(listener)
+        }
+    }
     
     // Collapse panel states
     var welcomeExpanded by remember { mutableStateOf(true) }
@@ -865,13 +877,35 @@ fun SetupScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { selectedLanguage = code }
+                                .clickable { 
+                                    val oldLanguage = selectedLanguage
+                                    selectedLanguage = code
+                                    if (oldLanguage != code) {
+                                        EventLogManager.logMenu("Dil değişikliği (SetupScreen)", "$oldLanguage -> $code")
+                                        menuManager.setSelectedLanguage(code)
+                                        // Eğer cihaz bağlıysa, mevcut menu'yu yeni dilde seslendir
+                                        if (connectionStatus == ConnectionStatus.CONNECTED) {
+                                            EventLogManager.logMenu("Cihaz bağlı, mevcut menu yeni dilde seslendirilebilir", "mainIndex ve subIndex kontrol edilmeli")
+                                        }
+                                    }
+                                }
                                 .padding(vertical = 12.dp, horizontal = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(
                                 selected = selectedLanguage == code,
-                                onClick = { selectedLanguage = code }
+                                onClick = { 
+                                    val oldLanguage = selectedLanguage
+                                    selectedLanguage = code
+                                    if (oldLanguage != code) {
+                                        EventLogManager.logMenu("Dil değişikliği (SetupScreen)", "$oldLanguage -> $code")
+                                        menuManager.setSelectedLanguage(code)
+                                        // Eğer cihaz bağlıysa, mevcut menu'yu yeni dilde seslendir
+                                        if (connectionStatus == ConnectionStatus.CONNECTED) {
+                                            EventLogManager.logMenu("Cihaz bağlı, mevcut menu yeni dilde seslendirilebilir", "mainIndex ve subIndex kontrol edilmeli")
+                                        }
+                                    }
+                                }
                             )
                             Spacer(modifier = Modifier.width(12.dp))
                             Text(

@@ -6,3 +6,9 @@
 # 4. local.properties dosyası .gitignore'da olduğu için GitHub'a commit edilmeyecek
 GOOGLE_TTS_API_KEY=your-api-key-here
 
+# Gemini API Key (Generative Language API)
+# Bu key Cloud Speech-to-Text, Generative Language API (Gemini Chat) ve Gemini TTS için kullanılır
+# Aynı GCP projesinden alınan key tüm servisler için yetkilidir
+# Varsayılan key (development için):
+GEMINI_API_KEY=AIzaSyBiR3IYsBKQnlZ1G2XvQ8g2fIKIP30GhwI
+

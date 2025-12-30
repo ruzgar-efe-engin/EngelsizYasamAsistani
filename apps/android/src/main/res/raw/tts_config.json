@@ -4,7 +4,7 @@
       "code": "tr",
       "name": "Türkçe",
       "googleTTS": {
-        "voiceId": "tr-TR-Wavenet-D",
+        "voiceId": "tr-TR-Wavenet-A",
         "languageCode": "tr-TR",
         "ssmlGender": "FEMALE"
       },
@@ -28,7 +28,7 @@
       "code": "de",
       "name": "Deutsch",
       "googleTTS": {
-        "voiceId": "de-DE-Wavenet-C",
+        "voiceId": "de-DE-Wavenet-A",
         "languageCode": "de-DE",
         "ssmlGender": "FEMALE"
       },

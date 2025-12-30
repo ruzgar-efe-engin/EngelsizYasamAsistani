@@ -216,7 +216,9 @@ public:
     if (_deviceConnected && !_oldDeviceConnected) {
       // Yeni bağlantı - pairing mode'u kapat
       _pairingModeActive = false;
-      Serial.println("[BLE] Cihaz bağlandı - Pairing mode sona erdi");
+      // LED'i söndür
+      digitalWrite(_ledPin, LOW);
+      Serial.println("[BLE] Cihaz bağlandı - Pairing mode sona erdi - LED söndürüldü");
       _oldDeviceConnected = _deviceConnected;
     }
   }
@@ -304,10 +306,13 @@ public:
       if (elapsed >= PAIRING_MODE_DURATION_MS) {
         // 30 saniye geçti - pairing mode'u kapat
         _pairingModeActive = false;
+        // LED'i söndür
+        digitalWrite(_ledPin, LOW);
+        ledState = false;
         if (!_deviceConnected) {
           disableBLE(); // Bağlantı yoksa BLE'yi kapat
         }
-        Serial.println("[BLE] Pairing mode sona erdi");
+        Serial.println("[BLE] Pairing mode sona erdi - LED söndürüldü");
       } else {
         // Pairing mode aktif - LED hızlı yanıp sönsün (250ms)
         if (now - lastBlinkTime >= 250) {

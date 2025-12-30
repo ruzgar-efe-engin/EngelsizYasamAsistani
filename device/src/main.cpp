@@ -20,7 +20,9 @@
 
 #include <Arduino.h>
 #include "EventTransport.h"
-#include "pins.h"
+#include "pin.h"
+
+
 
 #ifdef TRANSPORT_BLE
 #include <BLEDevice.h>
@@ -35,8 +37,8 @@
  * 
  * Not: Aynı anda sadece biri aktif olmalı. Diğerini yorum satırı yapın.
  */
-#define TRANSPORT_SERIAL  // Wokwi / Simülasyon için
-// #define TRANSPORT_BLE   // Gerçek cihaz için
+/// #define TRANSPORT_SERIAL  // Wokwi / Simülasyon için
+#define TRANSPORT_BLE   // Gerçek cihaz için
 
 
 

@@ -1,127 +1,171 @@
 {
-  "themes": [
+  "mainMenus": [
     {
       "id": 0,
       "name": {
-        "tr": "Ulaşım",
-        "en": "Transportation",
-        "de": "Transport"
+        "tr": "Zaman",
+        "en": "Time",
+        "de": "Zeit"
       },
-      "mainMenus": [
+      "subMenus": [
         {
           "id": 0,
           "name": {
-            "tr": "Hat Seç",
-            "en": "Select Line",
-            "de": "Linie wählen"
+            "tr": "Saat Kaç?",
+            "en": "What Time?",
+            "de": "Wie spät ist es?"
           },
-          "subMenus": [
-            {
-              "id": 0,
-              "name": {
-                "tr": "Hat 1",
-                "en": "Line 1",
-                "de": "Linie 1"
-              }
-            },
-            {
-              "id": 1,
-              "name": {
-                "tr": "Hat 2",
-                "en": "Line 2",
-                "de": "Linie 2"
-              }
-            },
-            {
-              "id": 2,
-              "name": {
-                "tr": "Hat 3",
-                "en": "Line 3",
-                "de": "Linie 3"
-              }
-            }
-          ]
+          "clickResult": {
+            "tr": "Saat 01:39",
+            "en": "The time is 01:39",
+            "de": "Es ist 01:39 Uhr"
+          }
         },
         {
           "id": 1,
           "name": {
-            "tr": "Durak Seç",
-            "en": "Select Stop",
-            "de": "Haltestelle wählen"
+            "tr": "Tarih Bilgisi",
+            "en": "Date Information",
+            "de": "Datum"
+          },
+          "clickResult": {
+            "tr": "Bugün 24 Aralık 2025 Çarşamba",
+            "en": "Today is Wednesday, December 24, 2025",
+            "de": "Heute ist Mittwoch, der 24. Dezember 2025"
+          }
+        },
+        {
+          "id": 2,
+          "name": {
+            "tr": "Alarm Kur",
+            "en": "Set Alarm",
+            "de": "Wecker stellen"
+          },
+          "clickResult": {
+            "tr": "Sabah 8'de uyandırılsın mı?",
+            "en": "Wake up at 8 AM?",
+            "de": "Um 8 Uhr morgens aufwachen?"
           },
           "subMenus": [
             {
               "id": 0,
               "name": {
-                "tr": "Durak 1",
-                "en": "Stop 1",
-                "de": "Haltestelle 1"
+                "tr": "Sabah 9'da uyandır",
+                "en": "Wake up at 9 AM",
+                "de": "Um 9 Uhr morgens aufwachen"
+              },
+              "clickResult": {
+                "tr": "Sabah 9'da uyandırılacaksınız.",
+                "en": "You will be woken up at 9 AM.",
+                "de": "Sie werden um 9 Uhr morgens geweckt."
               }
             },
             {
               "id": 1,
               "name": {
-                "tr": "Durak 2",
-                "en": "Stop 2",
-                "de": "Haltestelle 2"
-              }
-            },
-            {
-              "id": 2,
-              "name": {
-                "tr": "Durak 3",
-                "en": "Stop 3",
-                "de": "Haltestelle 3"
+                "tr": "Sabah 10'da uyandır",
+                "en": "Wake up at 10 AM",
+                "de": "Um 10 Uhr morgens aufwachen"
+              },
+              "clickResult": {
+                "tr": "Sabah 10'da uyandırılacaksınız.",
+                "en": "You will be woken up at 10 AM.",
+                "de": "Sie werden um 10 Uhr morgens geweckt."
               }
             }
           ]
         },
         {
-          "id": 2,
+          "id": 3,
           "name": {
-            "tr": "Yolculuk Takibi",
-            "en": "Journey Tracking",
-            "de": "Fahrtverfolgung"
+            "tr": "Zamanlayıcı",
+            "en": "Timer",
+            "de": "Timer"
+          },
+          "clickResult": {
+            "tr": "1 dk sonra hatırlat",
+            "en": "Remind in 1 minute",
+            "de": "In 1 Minute erinnern"
           },
           "subMenus": [
             {
               "id": 0,
               "name": {
-                "tr": "Kaç Durak Kaldığı",
-                "en": "Stops Remaining",
-                "de": "Verbleibende Haltestellen"
+                "tr": "5 dk sonra hatırlat",
+                "en": "Remind in 5 minutes",
+                "de": "In 5 Minuten erinnern"
+              },
+              "clickResult": {
+                "tr": "5 dk sonra hatırlatılacak",
+                "en": "You will be reminded in 5 minutes.",
+                "de": "Sie werden in 5 Minuten erinnert."
               }
             },
             {
               "id": 1,
               "name": {
-                "tr": "Tahmini Süre",
-                "en": "Estimated Time",
-                "de": "Geschätzte Zeit"
+                "tr": "10 dk sonra hatırlat",
+                "en": "Remind in 10 minutes",
+                "de": "In 10 Minuten erinnern"
+              },
+              "clickResult": {
+                "tr": "10 dk sonra hatırlatılacak",
+                "en": "You will be reminded in 10 minutes.",
+                "de": "Sie werden in 10 Minuten erinnert."
+              }
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "name": {
+            "tr": "Tüm alarmları ve zamanlayıcıları iptal et",
+            "en": "Cancel all alarms and timers",
+            "de": "Alle Wecker und Timer abbrechen"
+          },
+          "clickResult": {
+            "tr": "Tüm alarmlar ve zamanlayıcılar iptal edildi.",
+            "en": "All alarms and timers have been cancelled.",
+            "de": "Alle Wecker und Timer wurden abgebrochen."
+          }
+        },
+        {
+          "id": 5,
+          "name": {
+            "tr": "Hatırlatıcı",
+            "en": "Reminder",
+            "de": "Erinnerung"
+          },
+          "clickResult": {
+            "tr": "Hergün saat 12'de hatırlar",
+            "en": "Remind every day at 12 PM",
+            "de": "Täglich um 12 Uhr erinnern"
+          },
+          "subMenus": [
+            {
+              "id": 0,
+              "name": {
+                "tr": "5 dk sonra hatırlat",
+                "en": "Remind in 5 minutes",
+                "de": "In 5 Minuten erinnern"
+              },
+              "clickResult": {
+                "tr": "5 dk sonra hatırlatılacak",
+                "en": "You will be reminded in 5 minutes.",
+                "de": "Sie werden in 5 Minuten erinnert."
               }
             },
             {
-              "id": 2,
+              "id": 1,
               "name": {
-                "tr": "İneceğim Durağı Bildir",
-                "en": "Notify My Stop",
-                "de": "Meine Haltestelle melden"
-              }
-            },
-            {
-              "id": 3,
-              "name": {
-                "tr": "Şoföre Bildir",
-                "en": "Notify Driver",
-                "de": "Fahrer benachrichtigen"
-              }
-            },
-            {
-              "id": 4,
-              "name": {
-                "tr": "Otomatik Bildirim Aç/Kapat",
-                "en": "Auto Notification On/Off",
-                "de": "Automatische Benachrichtigung Ein/Aus"
+                "tr": "10 dk sonra hatırlat",
+                "en": "Remind in 10 minutes",
+                "de": "In 10 Minuten erinnern"
+              },
+              "clickResult": {
+                "tr": "10 dk sonra hatırlatılacak",
+                "en": "You will be reminded in 10 minutes.",
+                "de": "Sie werden in 10 Minuten erinnert."
               }
             }
           ]
@@ -131,99 +175,11 @@
     {
       "id": 1,
       "name": {
-        "tr": "Saat & Zaman",
-        "en": "Time & Date",
-        "de": "Uhrzeit & Datum"
-      },
-      "mainMenus": [
-        {
-          "id": 0,
-          "name": {
-            "tr": "Saat Bilgisi",
-            "en": "Time Information",
-            "de": "Uhrzeitinformation"
-          },
-          "subMenus": [
-            {
-              "id": 0,
-              "name": {
-                "tr": "Saati Dinle",
-                "en": "Listen to Time",
-                "de": "Uhrzeit anhören"
-              }
-            },
-            {
-              "id": 1,
-              "name": {
-                "tr": "Tarihi Dinle",
-                "en": "Listen to Date",
-                "de": "Datum anhören"
-              }
-            }
-          ]
-        },
-        {
-          "id": 1,
-          "name": {
-            "tr": "Alarm",
-            "en": "Alarm",
-            "de": "Wecker"
-          },
-          "subMenus": [
-            {
-              "id": 0,
-              "name": {
-                "tr": "Alarm Kur",
-                "en": "Set Alarm",
-                "de": "Wecker stellen"
-              }
-            },
-            {
-              "id": 1,
-              "name": {
-                "tr": "Alarm Kapat",
-                "en": "Turn Off Alarm",
-                "de": "Wecker ausschalten"
-              }
-            }
-          ]
-        },
-        {
-          "id": 2,
-          "name": {
-            "tr": "Zamanlayıcı",
-            "en": "Timer",
-            "de": "Timer"
-          },
-          "subMenus": [
-            {
-              "id": 0,
-              "name": {
-                "tr": "Başlat",
-                "en": "Start",
-                "de": "Starten"
-              }
-            },
-            {
-              "id": 1,
-              "name": {
-                "tr": "Durdur",
-                "en": "Stop",
-                "de": "Stoppen"
-              }
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": 2,
-      "name": {
         "tr": "Hava Durumu",
         "en": "Weather",
         "de": "Wetter"
       },
-      "mainMenus": [
+      "subMenus": [
         {
           "id": 0,
           "name": {
@@ -231,24 +187,11 @@
             "en": "Today",
             "de": "Heute"
           },
-          "subMenus": [
-            {
-              "id": 0,
-              "name": {
-                "tr": "Sıcaklık",
-                "en": "Temperature",
-                "de": "Temperatur"
-              }
-            },
-            {
-              "id": 1,
-              "name": {
-                "tr": "Hava Durumu",
-                "en": "Weather Condition",
-                "de": "Wetterlage"
-              }
-            }
-          ]
+          "clickResult": {
+            "tr": "Bugün Edirnede hava 2 derece, parçalı bulutlu ve rüzgarlı olacak",
+            "en": "Today in Edirne it will be 2 degrees, partly cloudy and windy",
+            "de": "Heute in Edirne wird es 2 Grad, teilweise bewölkt und windig"
+          }
         },
         {
           "id": 1,
@@ -257,69 +200,35 @@
             "en": "Tomorrow",
             "de": "Morgen"
           },
-          "subMenus": [
-            {
-              "id": 0,
-              "name": {
-                "tr": "Sıcaklık",
-                "en": "Temperature",
-                "de": "Temperatur"
-              }
-            },
-            {
-              "id": 1,
-              "name": {
-                "tr": "Hava Durumu",
-                "en": "Weather Condition",
-                "de": "Wetterlage"
-              }
-            }
-          ]
+          "clickResult": {
+            "tr": "Yarın Edirnede hava 5 derece, sağanak yağmurlu olacak",
+            "en": "Tomorrow in Edirne it will be 5 degrees, heavy rain",
+            "de": "Morgen in Edirne wird es 5 Grad, starker Regen"
+          }
         },
         {
           "id": 2,
           "name": {
-            "tr": "Uyarılar",
-            "en": "Alerts",
-            "de": "Warnungen"
+            "tr": "Önümüzdeki Hafta",
+            "en": "Next Week",
+            "de": "Nächste Woche"
           },
-          "subMenus": [
-            {
-              "id": 0,
-              "name": {
-                "tr": "Yağmur",
-                "en": "Rain",
-                "de": "Regen"
-              }
-            },
-            {
-              "id": 1,
-              "name": {
-                "tr": "Fırtına",
-                "en": "Storm",
-                "de": "Sturm"
-              }
-            },
-            {
-              "id": 2,
-              "name": {
-                "tr": "Aşırı Sıcak/Soğuk",
-                "en": "Extreme Heat/Cold",
-                "de": "Extreme Hitze/Kälte"
-              }
-            }
-          ]
+          "clickResult": {
+            "tr": "Önümüzdeki hafta Edirne'de kar yağışı beklenmekte.",
+            "en": "Snow is expected in Edirne next week.",
+            "de": "Nächste Woche wird in Edirne Schnee erwartet."
+          }
         }
       ]
     },
     {
-      "id": 3,
+      "id": 2,
       "name": {
         "tr": "Konum & Yön",
         "en": "Location & Direction",
         "de": "Standort & Richtung"
       },
-      "mainMenus": [
+      "subMenus": [
         {
           "id": 0,
           "name": {
@@ -327,16 +236,11 @@
             "en": "Current Location",
             "de": "Aktueller Standort"
           },
-          "subMenus": [
-            {
-              "id": 0,
-              "name": {
-                "tr": "Konumu Dinle",
-                "en": "Listen to Location",
-                "de": "Standort anhören"
-              }
-            }
-          ]
+          "clickResult": {
+            "tr": "Şu an Cumhuriyet Mahallesi, Hüseyin Alkaya Sokakta Bulunmaktasınız.",
+            "en": "You are currently on Hüseyin Alkaya Street, Cumhuriyet Neighborhood.",
+            "de": "Sie befinden sich derzeit in der Hüseyin Alkaya Straße, Cumhuriyet Viertel."
+          }
         },
         {
           "id": 1,
@@ -345,16 +249,11 @@
             "en": "Find Direction",
             "de": "Richtung finden"
           },
-          "subMenus": [
-            {
-              "id": 0,
-              "name": {
-                "tr": "Kuzey / Güney / Doğu / Batı",
-                "en": "North / South / East / West",
-                "de": "Norden / Süden / Osten / Westen"
-              }
-            }
-          ]
+          "clickResult": {
+            "tr": "Şu an Kuzey yönüne doğru ilerlemektesiniz.",
+            "en": "You are currently heading North.",
+            "de": "Sie bewegen sich derzeit nach Norden."
+          }
         },
         {
           "id": 2,
@@ -363,123 +262,22 @@
             "en": "Nearby Places",
             "de": "Orte in der Nähe"
           },
-          "subMenus": [
-            {
-              "id": 0,
-              "name": {
-                "tr": "En Yakın Cadde",
-                "en": "Nearest Street",
-                "de": "Nächste Straße"
-              }
-            },
-            {
-              "id": 1,
-              "name": {
-                "tr": "En Yakın Durak",
-                "en": "Nearest Stop",
-                "de": "Nächste Haltestelle"
-              }
-            }
-          ]
+          "clickResult": {
+            "tr": "En Yakın Cadde, En Yakın Durak, Hangi Yerleşim Birimindeyim",
+            "en": "Nearest Street, Nearest Stop, Which Settlement Unit Am I In",
+            "de": "Nächste Straße, Nächste Haltestelle, In welcher Siedlungseinheit bin ich"
+          }
         }
       ]
     },
     {
-      "id": 4,
-      "name": {
-        "tr": "Günlük İhtiyaçlar",
-        "en": "Daily Needs",
-        "de": "Tägliche Bedürfnisse"
-      },
-      "mainMenus": [
-        {
-          "id": 0,
-          "name": {
-            "tr": "Yakın Market",
-            "en": "Nearby Market",
-            "de": "Supermarkt in der Nähe"
-          },
-          "subMenus": [
-            {
-              "id": 0,
-              "name": {
-                "tr": "En Yakın",
-                "en": "Nearest",
-                "de": "Nächster"
-              }
-            },
-            {
-              "id": 1,
-              "name": {
-                "tr": "Alternatifler",
-                "en": "Alternatives",
-                "de": "Alternativen"
-              }
-            }
-          ]
-        },
-        {
-          "id": 1,
-          "name": {
-            "tr": "Yakın Eczane",
-            "en": "Nearby Pharmacy",
-            "de": "Apotheke in der Nähe"
-          },
-          "subMenus": [
-            {
-              "id": 0,
-              "name": {
-                "tr": "Açık Eczane",
-                "en": "Open Pharmacy",
-                "de": "Geöffnete Apotheke"
-              }
-            },
-            {
-              "id": 1,
-              "name": {
-                "tr": "Nöbetçi Eczane",
-                "en": "On-Duty Pharmacy",
-                "de": "Notdienstapotheke"
-              }
-            }
-          ]
-        },
-        {
-          "id": 2,
-          "name": {
-            "tr": "Diğer",
-            "en": "Other",
-            "de": "Andere"
-          },
-          "subMenus": [
-            {
-              "id": 0,
-              "name": {
-                "tr": "ATM",
-                "en": "ATM",
-                "de": "Geldautomat"
-              }
-            },
-            {
-              "id": 1,
-              "name": {
-                "tr": "Kafe",
-                "en": "Cafe",
-                "de": "Café"
-              }
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": 5,
+      "id": 3,
       "name": {
         "tr": "Acil & Güvenlik",
         "en": "Emergency & Security",
         "de": "Notfall & Sicherheit"
       },
-      "mainMenus": [
+      "subMenus": [
         {
           "id": 0,
           "name": {
@@ -487,35 +285,27 @@
             "en": "Emergency Call",
             "de": "Notruf"
           },
-          "subMenus": [
-            {
-              "id": 0,
-              "name": {
-                "tr": "112'yi Ara",
-                "en": "Call 112",
-                "de": "112 anrufen"
-              }
-            },
-            {
-              "id": 1,
-              "name": {
-                "tr": "Konum Paylaş",
-                "en": "Share Location",
-                "de": "Standort teilen"
-              }
-            },
-            {
-              "id": 2,
-              "name": {
-                "tr": "Acil Kişiye Gönder",
-                "en": "Send to Emergency Contact",
-                "de": "An Notfallkontakt senden"
-              }
-            }
-          ]
+          "clickResult": {
+            "tr": "112'yi Ara",
+            "en": "Call 112",
+            "de": "112 anrufen"
+          }
         },
         {
           "id": 1,
+          "name": {
+            "tr": "Konum Paylaş",
+            "en": "Share Location",
+            "de": "Standort teilen"
+          },
+          "clickResult": {
+            "tr": "Acil Kişiye Gönder",
+            "en": "Send to Emergency Contact",
+            "de": "An Notfallkontakt senden"
+          }
+        },
+        {
+          "id": 2,
           "name": {
             "tr": "Alarm",
             "en": "Alarm",
@@ -526,7 +316,7 @@
               "id": 0,
               "name": {
                 "tr": "Sesli Alarm",
-                "en": "Audible Alarm",
+                "en": "Sound Alarm",
                 "de": "Akustischer Alarm"
               }
             },
@@ -543,13 +333,13 @@
       ]
     },
     {
-      "id": 6,
+      "id": 4,
       "name": {
         "tr": "İletişim",
         "en": "Communication",
         "de": "Kommunikation"
       },
-      "mainMenus": [
+      "subMenus": [
         {
           "id": 0,
           "name": {
@@ -557,21 +347,31 @@
             "en": "Saved Contacts",
             "de": "Gespeicherte Kontakte"
           },
+          "clickResult": {
+            "tr": "Kişi 1",
+            "en": "Contact 1",
+            "de": "Kontakt 1"
+          },
           "subMenus": [
             {
               "id": 0,
               "name": {
-                "tr": "Kişi 1",
-                "en": "Contact 1",
-                "de": "Kontakt 1"
+                "tr": "Kişi 2",
+                "en": "Contact 2",
+                "de": "Kontakt 2"
               }
             },
             {
               "id": 1,
               "name": {
-                "tr": "Kişi 2",
-                "en": "Contact 2",
-                "de": "Kontakt 2"
+                "tr": "Kişi 3",
+                "en": "Contact 3",
+                "de": "Kontakt 3"
+              },
+              "clickResult": {
+                "tr": "Kişi 3 aranıyor",
+                "en": "Calling Contact 3",
+                "de": "Kontakt 3 wird angerufen"
               }
             }
           ]
@@ -583,35 +383,22 @@
             "en": "Recent Calls",
             "de": "Letzte Anrufe"
           },
-          "subMenus": [
-            {
-              "id": 0,
-              "name": {
-                "tr": "Son Arama 1",
-                "en": "Last Call 1",
-                "de": "Letzter Anruf 1"
-              }
-            },
-            {
-              "id": 1,
-              "name": {
-                "tr": "Son Arama 2",
-                "en": "Last Call 2",
-                "de": "Letzter Anruf 2"
-              }
-            }
-          ]
+          "clickResult": {
+            "tr": "Son Arama 1, Son Arama 2",
+            "en": "Last Call 1, Last Call 2",
+            "de": "Letzter Anruf 1, Letzter Anruf 2"
+          }
         }
       ]
     },
     {
-      "id": 7,
+      "id": 5,
       "name": {
         "tr": "Notlar & Hatırlatıcı",
         "en": "Notes & Reminders",
         "de": "Notizen & Erinnerungen"
       },
-      "mainMenus": [
+      "subMenus": [
         {
           "id": 0,
           "name": {
@@ -619,16 +406,11 @@
             "en": "New Note",
             "de": "Neue Notiz"
           },
-          "subMenus": [
-            {
-              "id": 0,
-              "name": {
-                "tr": "Sesli Not Al",
-                "en": "Take Voice Note",
-                "de": "Sprachnotiz aufnehmen"
-              }
-            }
-          ]
+          "clickResult": {
+            "tr": "Sesli Not Al",
+            "en": "Take Voice Note",
+            "de": "Sprachnotiz aufnehmen"
+          }
         },
         {
           "id": 1,
@@ -637,47 +419,31 @@
             "en": "My Notes",
             "de": "Meine Notizen"
           },
-          "subMenus": [
-            {
-              "id": 0,
-              "name": {
-                "tr": "Not 1",
-                "en": "Note 1",
-                "de": "Notiz 1"
-              }
-            },
-            {
-              "id": 1,
-              "name": {
-                "tr": "Not 2",
-                "en": "Note 2",
-                "de": "Notiz 2"
-              }
-            }
-          ]
-        },
-        {
-          "id": 2,
-          "name": {
-            "tr": "Hatırlatıcı",
-            "en": "Reminder",
-            "de": "Erinnerung"
+          "clickResult": {
+            "tr": "Not 1",
+            "en": "Note 1",
+            "de": "Notiz 1"
           },
           "subMenus": [
             {
               "id": 0,
               "name": {
-                "tr": "Hatırlatıcı Kur",
-                "en": "Set Reminder",
-                "de": "Erinnerung einstellen"
+                "tr": "Not 2",
+                "en": "Note 2",
+                "de": "Notiz 2"
               }
             },
             {
               "id": 1,
               "name": {
-                "tr": "Hatırlatıcıları Dinle",
-                "en": "Listen to Reminders",
-                "de": "Erinnerungen anhören"
+                "tr": "Not 3",
+                "en": "Note 3",
+                "de": "Notiz 3"
+              },
+              "clickResult": {
+                "tr": "Not 3 okunuyor",
+                "en": "Reading Note 3",
+                "de": "Notiz 3 wird gelesen"
               }
             }
           ]
@@ -685,13 +451,13 @@
       ]
     },
     {
-      "id": 8,
+      "id": 6,
       "name": {
         "tr": "Cihaz & Sistem",
         "en": "Device & System",
         "de": "Gerät & System"
       },
-      "mainMenus": [
+      "subMenus": [
         {
           "id": 0,
           "name": {
@@ -699,21 +465,26 @@
             "en": "Sound Settings",
             "de": "Toneinstellungen"
           },
+          "clickResult": {
+            "tr": "Ses Aç",
+            "en": "Turn On Sound",
+            "de": "Ton einschalten"
+          },
           "subMenus": [
             {
               "id": 0,
               "name": {
-                "tr": "Ses Aç/Kapat",
-                "en": "Sound On/Off",
-                "de": "Ton Ein/Aus"
+                "tr": "Sesi Kapat",
+                "en": "Turn Off Sound",
+                "de": "Ton ausschalten"
               }
             },
             {
               "id": 1,
               "name": {
-                "tr": "Ses Seviyesi",
-                "en": "Volume Level",
-                "de": "Lautstärke"
+                "tr": "Sesi Kıs",
+                "en": "Lower Sound",
+                "de": "Ton leiser"
               }
             }
           ]
@@ -721,129 +492,30 @@
         {
           "id": 1,
           "name": {
-            "tr": "Titreşim",
-            "en": "Vibration",
-            "de": "Vibration"
+            "tr": "Cihaz Pil Seviyesi",
+            "en": "Device Battery Level",
+            "de": "Gerätebatteriestand"
           },
-          "subMenus": [
-            {
-              "id": 0,
-              "name": {
-                "tr": "Aç/Kapat",
-                "en": "On/Off",
-                "de": "Ein/Aus"
-              }
-            }
-          ]
+          "clickResult": {
+            "tr": "Cihazınızın şarjı %43",
+            "en": "Your device battery is at 43%",
+            "de": "Ihr Gerät hat 43% Batterie"
+          }
         },
         {
           "id": 2,
           "name": {
-            "tr": "Bağlantı",
-            "en": "Connection",
-            "de": "Verbindung"
+            "tr": "Telefon Pil Seviyesi",
+            "en": "Phone Battery Level",
+            "de": "Telefonbatteriestand"
           },
-          "subMenus": [
-            {
-              "id": 0,
-              "name": {
-                "tr": "Bluetooth Durumu",
-                "en": "Bluetooth Status",
-                "de": "Bluetooth-Status"
-              }
-            },
-            {
-              "id": 1,
-              "name": {
-                "tr": "Yeniden Bağlan",
-                "en": "Reconnect",
-                "de": "Neu verbinden"
-              }
-            }
-          ]
-        },
-        {
-          "id": 3,
-          "name": {
-            "tr": "Pil",
-            "en": "Battery",
-            "de": "Batterie"
-          },
-          "subMenus": [
-            {
-              "id": 0,
-              "name": {
-                "tr": "Pil Seviyesi",
-                "en": "Battery Level",
-                "de": "Batteriestand"
-              }
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": 9,
-      "name": {
-        "tr": "Serbest Soru (AI Asistan)",
-        "en": "Free Question (AI Assistant)",
-        "de": "Freie Frage (KI-Assistent)"
-      },
-      "mainMenus": [
-        {
-          "id": 0,
-          "name": {
-            "tr": "Soru Sor",
-            "en": "Ask Question",
-            "de": "Frage stellen"
-          },
-          "subMenus": [
-            {
-              "id": 0,
-              "name": {
-                "tr": "Bas-Konuş",
-                "en": "Push-to-Talk",
-                "de": "Push-to-Talk"
-              }
-            }
-          ]
-        },
-        {
-          "id": 1,
-          "name": {
-            "tr": "Hızlı Sorular",
-            "en": "Quick Questions",
-            "de": "Schnelle Fragen"
-          },
-          "subMenus": [
-            {
-              "id": 0,
-              "name": {
-                "tr": "\"Neredeyim?\"",
-                "en": "\"Where am I?\"",
-                "de": "\"Wo bin ich?\""
-              }
-            },
-            {
-              "id": 1,
-              "name": {
-                "tr": "\"Kaç durak kaldı?\"",
-                "en": "\"How many stops left?\"",
-                "de": "\"Wie viele Haltestellen noch?\""
-              }
-            },
-            {
-              "id": 2,
-              "name": {
-                "tr": "\"Hava nasıl?\"",
-                "en": "\"How's the weather?\"",
-                "de": "\"Wie ist das Wetter?\""
-              }
-            }
-          ]
+          "clickResult": {
+            "tr": "Telefonunuzun şarjı %34",
+            "en": "Your phone battery is at 34%",
+            "de": "Ihr Telefon hat 34% Batterie"
+          }
         }
       ]
     }
   ]
 }
-

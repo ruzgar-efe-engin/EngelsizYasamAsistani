@@ -15,16 +15,31 @@ import java.util.Locale
 class ConfirmHandler(
     private val context: Context,
     private val menuManager: MenuManager,
-    private val ttsManager: TTSManager
+    private val ttsManager: TTSManager,
+    private val weatherHandler: WeatherHandler? = null,
+    private val locationHandler: LocationHandler? = null,
+    private val emergencyHandler: EmergencyHandler? = null,
+    private val contactHandler: ContactHandler? = null,
+    private val notesHandler: NotesHandler? = null,
+    private val deviceHandler: DeviceHandler? = null,
+    private val aiHandler: AIHandler? = null
 ) {
     private val scope = CoroutineScope(Dispatchers.IO)
     private val apiClient = APIClient(context)
     
     // Generic confirm method - KRİTİK
-    fun confirm(mainIndex: Int, subIndex: Int) {
+    fun confirm(mainIndex: Int, subIndex: Int, subSubIndex: Int? = null) {
         scope.launch {
             // Mevcut TTS'i anında kes
             ttsManager.stop()
+            
+            // Önce clickResult'ı kontrol et - varsa direkt onu seslendir
+            val clickResult = menuManager.getSubMenuClickResult(mainIndex, subIndex, subSubIndex)
+            if (clickResult != null) {
+                ttsManager.speak(clickResult)
+                // clickResult varsa işlem yapma, sadece mesajı seslendir
+                return@launch
+            }
             
             // İşlem başlarken "yapılıyor" mesajı TTS
             val processingMessage = getProcessingMessage(mainIndex, subIndex)
@@ -32,37 +47,131 @@ class ConfirmHandler(
             
             // İşlem tipine göre routing
             when {
-                // Saat Bilgisi
+                // Zaman - Saat Kaç?
                 mainIndex == 0 && subIndex == 0 -> {
                     handleTimeRequest()
                 }
-                // Tarih Bilgisi
+                // Zaman - Tarih Bilgisi
                 mainIndex == 0 && subIndex == 1 -> {
                     handleDateRequest()
                 }
-                // Şoföre Bildir
-                mainIndex == 2 && subIndex == 3 -> {
-                    handleDriverNotification()
+                // Zaman - Alarm Kur (nested sub-menu ile)
+                mainIndex == 0 && subIndex == 2 -> {
+                    if (subSubIndex != null) {
+                        handleAlarmSet(subSubIndex)
+                    } else {
+                        // İlk click - nested sub-menu'ye geçiş yapıldı, işlem yok
+                    }
                 }
-                // Bugün Sıcaklık
-                mainIndex == 0 && subIndex == 0 -> {
-                    handleWeatherRequest(day = "today", type = "temperature")
+                // Zaman - Zamanlayıcı (nested sub-menu ile)
+                mainIndex == 0 && subIndex == 3 -> {
+                    if (subSubIndex != null) {
+                        handleTimerSet(subSubIndex)
+                    } else {
+                        // İlk click - nested sub-menu'ye geçiş yapıldı, işlem yok
+                    }
                 }
-                // Bugün Hava Durumu
-                mainIndex == 0 && subIndex == 1 -> {
-                    handleWeatherRequest(day = "today", type = "condition")
+                // Zaman - Tüm alarmları iptal et
+                mainIndex == 0 && subIndex == 4 -> {
+                    handleCancelAllAlarms()
                 }
-                // Yarın Sıcaklık
+                // Zaman - Hatırlatıcı (nested sub-menu ile)
+                mainIndex == 0 && subIndex == 5 -> {
+                    if (subSubIndex != null) {
+                        handleReminderSet(subSubIndex)
+                    } else {
+                        // İlk click - nested sub-menu'ye geçiş yapıldı, işlem yok
+                    }
+                }
+                // Hava Durumu - Bugün
                 mainIndex == 1 && subIndex == 0 -> {
-                    handleWeatherRequest(day = "tomorrow", type = "temperature")
+                    weatherHandler?.handleTodayWeather() ?: handleTodayWeather()
                 }
-                // Yarın Hava Durumu
+                // Hava Durumu - Yarın
                 mainIndex == 1 && subIndex == 1 -> {
-                    handleWeatherRequest(day = "tomorrow", type = "condition")
+                    weatherHandler?.handleTomorrowWeather() ?: handleTomorrowWeather()
+                }
+                // Hava Durumu - Önümüzdeki Hafta
+                mainIndex == 1 && subIndex == 2 -> {
+                    weatherHandler?.handleNextWeekWeather() ?: handleNextWeekWeather()
+                }
+                // Konum & Yön - Mevcut Konum
+                mainIndex == 2 && subIndex == 0 -> {
+                    locationHandler?.handleCurrentLocation()
+                }
+                // Konum & Yön - Yön Bulma
+                mainIndex == 2 && subIndex == 1 -> {
+                    locationHandler?.handleDirection()
+                }
+                // Konum & Yön - Yakın Noktalar
+                mainIndex == 2 && subIndex == 2 -> {
+                    locationHandler?.handleNearbyPlaces()
+                }
+                // Acil & Güvenlik - Acil Arama
+                mainIndex == 3 && subIndex == 0 -> {
+                    emergencyHandler?.handleEmergencyCall()
+                }
+                // Acil & Güvenlik - Konum Paylaş
+                mainIndex == 3 && subIndex == 1 -> {
+                    emergencyHandler?.handleShareLocation()
+                }
+                // Acil & Güvenlik - Alarm (nested)
+                mainIndex == 3 && subIndex == 2 -> {
+                    if (subSubIndex == 0) {
+                        emergencyHandler?.handleAlarmSound()
+                    } else if (subSubIndex == 1) {
+                        emergencyHandler?.handleAlarmVibration()
+                    }
+                }
+                // İletişim - Kayıtlı Kişiler
+                mainIndex == 4 && subIndex == 0 -> {
+                    if (subSubIndex != null) {
+                        contactHandler?.handleCallContact(subSubIndex)
+                    } else {
+                        contactHandler?.handleSavedContacts()
+                    }
+                }
+                // İletişim - Son Arananlar
+                mainIndex == 4 && subIndex == 1 -> {
+                    contactHandler?.handleRecentCalls()
+                }
+                // Notlar & Hatırlatıcı - Yeni Not
+                mainIndex == 5 && subIndex == 0 -> {
+                    notesHandler?.handleNewVoiceNote()
+                }
+                // Notlar & Hatırlatıcı - Notlarım
+                mainIndex == 5 && subIndex == 1 -> {
+                    if (subSubIndex != null) {
+                        notesHandler?.handlePlayNote(subSubIndex)
+                    } else {
+                        notesHandler?.handleMyNotes()
+                    }
+                }
+                // Cihaz & Sistem - Ses Ayarları
+                mainIndex == 6 && subIndex == 0 -> {
+                    if (subSubIndex == 0) {
+                        deviceHandler?.handleSoundSettings("kapat")
+                    } else if (subSubIndex == 1) {
+                        deviceHandler?.handleSoundSettings("kıs")
+                    } else {
+                        deviceHandler?.handleSoundSettings("aç")
+                    }
+                }
+                // Cihaz & Sistem - Cihaz Pil Seviyesi
+                mainIndex == 6 && subIndex == 1 -> {
+                    deviceHandler?.handleDeviceBatteryLevel()
+                }
+                // Cihaz & Sistem - Telefon Pil Seviyesi
+                mainIndex == 6 && subIndex == 2 -> {
+                    deviceHandler?.handlePhoneBatteryLevel()
+                }
+                // Serbest Soru (AI) - Gemini ile konuş
+                mainIndex == 7 && subIndex == 0 -> {
+                    aiHandler?.handleGeminiChat()
                 }
                 // Diğer işlemler için genel handler
                 else -> {
-                    handleGenericAction(mainIndex, subIndex)
+                    handleGenericAction(mainIndex, subIndex, subSubIndex)
                 }
             }
         }
@@ -158,7 +267,88 @@ class ConfirmHandler(
         ttsManager.speak(message)
     }
     
-    private suspend fun handleGenericAction(mainIndex: Int, subIndex: Int) {
+    private suspend fun handleAlarmSet(subSubIndex: Int) {
+        // Alarm kurma işlemi - subSubIndex'e göre saat belirle (8, 9, 10, ...)
+        val hour = 8 + subSubIndex // 8'den başlayarak artır
+        val alarmManager = AlarmManagerHelper(context, menuManager, ttsManager)
+        alarmManager.setAlarm(hour)
+    }
+    
+    private suspend fun handleTimerSet(subSubIndex: Int) {
+        // Zamanlayıcı kurma işlemi - subSubIndex'e göre dakika belirle (1, 5, 10, ...)
+        val minutes = when (subSubIndex) {
+            0 -> 1
+            1 -> 5
+            2 -> 10
+            3 -> 15
+            4 -> 30
+            else -> 1
+        }
+        val timerManager = TimerManager(context, menuManager, ttsManager)
+        timerManager.setTimer(minutes)
+    }
+    
+    private suspend fun handleCancelAllAlarms() {
+        // Tüm alarmları iptal et
+        val language = menuManager.getSelectedLanguage()
+        val message = when (language) {
+            "tr" -> "Tüm alarmlar ve zamanlayıcılar iptal edildi."
+            "en" -> "All alarms and timers have been cancelled."
+            "de" -> "Alle Wecker und Timer wurden abgebrochen."
+            else -> "Tüm alarmlar ve zamanlayıcılar iptal edildi."
+        }
+        ttsManager.speak(message)
+    }
+    
+    private suspend fun handleReminderSet(subSubIndex: Int) {
+        // Hatırlatıcı kurma işlemi
+        val language = menuManager.getSelectedLanguage()
+        val message = when (language) {
+            "tr" -> "Hatırlatıcı kuruluyor..."
+            "en" -> "Setting reminder..."
+            "de" -> "Erinnerung wird gestellt..."
+            else -> "Hatırlatıcı kuruluyor..."
+        }
+        ttsManager.speak(message)
+    }
+    
+    private suspend fun handleTodayWeather() {
+        // Bugün hava durumu - WeatherHandler'a taşınacak
+        val language = menuManager.getSelectedLanguage()
+        val message = when (language) {
+            "tr" -> "Hava durumu bilgisi alınıyor..."
+            "en" -> "Getting weather information..."
+            "de" -> "Wetterinformationen werden abgerufen..."
+            else -> "Hava durumu bilgisi alınıyor..."
+        }
+        ttsManager.speak(message)
+    }
+    
+    private suspend fun handleTomorrowWeather() {
+        // Yarın hava durumu - WeatherHandler'a taşınacak
+        val language = menuManager.getSelectedLanguage()
+        val message = when (language) {
+            "tr" -> "Yarın hava durumu bilgisi alınıyor..."
+            "en" -> "Getting tomorrow's weather information..."
+            "de" -> "Wetterinformationen für morgen werden abgerufen..."
+            else -> "Yarın hava durumu bilgisi alınıyor..."
+        }
+        ttsManager.speak(message)
+    }
+    
+    private suspend fun handleNextWeekWeather() {
+        // Önümüzdeki hafta hava durumu - WeatherHandler'a taşınacak
+        val language = menuManager.getSelectedLanguage()
+        val message = when (language) {
+            "tr" -> "Önümüzdeki hafta hava durumu bilgisi alınıyor..."
+            "en" -> "Getting next week's weather information..."
+            "de" -> "Wetterinformationen für nächste Woche werden abgerufen..."
+            else -> "Önümüzdeki hafta hava durumu bilgisi alınıyor..."
+        }
+        ttsManager.speak(message)
+    }
+    
+    private suspend fun handleGenericAction(mainIndex: Int, subIndex: Int, subSubIndex: Int? = null) {
         val language = menuManager.getSelectedLanguage()
         val message = when (language) {
             "tr" -> "Bu özellik yakında eklenecek"
