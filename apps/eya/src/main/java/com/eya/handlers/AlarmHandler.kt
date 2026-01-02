@@ -1,65 +1,18 @@
 package com.eya.handlers
 
-import android.app.AlarmManager
-import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.content.SharedPreferences
 import com.eya.TTSManager
-import com.eya.receivers.AlarmReceiver
 import com.eya.utils.GeminiClient
+import com.eya.utils.SystemAlarmHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import org.json.JSONArray
-import org.json.JSONObject
-import java.util.Calendar
 
 class AlarmHandler(private val context: Context) {
-    private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
     private val geminiClient = GeminiClient()
+    private val systemAlarmHelper = SystemAlarmHelper(context)
     private val scope = CoroutineScope(Dispatchers.Main)
-    private val prefs: SharedPreferences = context.getSharedPreferences("EYA_ALARMS", Context.MODE_PRIVATE)
-    
-    private fun saveAlarms(alarms: List<AlarmData>) {
-        val jsonArray = JSONArray()
-        alarms.forEach { alarm ->
-            val json = JSONObject().apply {
-                put("id", alarm.id)
-                put("time", alarm.time)
-                put("timestamp", alarm.timestamp)
-            }
-            jsonArray.put(json)
-        }
-        prefs.edit().putString("alarms", jsonArray.toString()).apply()
-    }
-    
-    private fun loadAlarms(): List<AlarmData> {
-        val alarmsJson = prefs.getString("alarms", "[]") ?: "[]"
-        val alarms = mutableListOf<AlarmData>()
-        try {
-            val jsonArray = JSONArray(alarmsJson)
-            for (i in 0 until jsonArray.length()) {
-                val json = jsonArray.getJSONObject(i)
-                alarms.add(
-                    AlarmData(
-                        id = json.getLong("id"),
-                        time = json.getString("time"),
-                        timestamp = json.getLong("timestamp")
-                    )
-                )
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-        return alarms
-    }
-    
-    data class AlarmData(
-        val id: Long,
-        val time: String,
-        val timestamp: Long
-    )
     
     fun handleSetAlarm(
         transcribedText: String,
@@ -74,64 +27,41 @@ class AlarmHandler(private val context: Context) {
                     val hour = parts[0].toInt()
                     val minute = parts[1].toInt()
                     
-                    val calendar = Calendar.getInstance().apply {
-                        set(Calendar.HOUR_OF_DAY, hour)
-                        set(Calendar.MINUTE, minute)
-                        set(Calendar.SECOND, 0)
-                        
-                        // Eğer geçmiş bir saat seçildiyse, yarın için ayarla
-                        if (timeInMillis < System.currentTimeMillis()) {
-                            add(Calendar.DAY_OF_MONTH, 1)
+                    // Android'in Clock uygulamasını aç ve sistem alarmı kur
+                    try {
+                        val clockIntent = Intent(android.provider.AlarmClock.ACTION_SET_ALARM).apply {
+                            putExtra(android.provider.AlarmClock.EXTRA_HOUR, hour)
+                            putExtra(android.provider.AlarmClock.EXTRA_MINUTES, minute)
+                            putExtra(android.provider.AlarmClock.EXTRA_SKIP_UI, false) // UI'ı göster
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
                         }
+                        
+                        // Clock uygulaması yüklü mü kontrol et
+                        if (clockIntent.resolveActivity(context.packageManager) != null) {
+                            context.startActivity(clockIntent)
+                            val text = if (language == "tr") {
+                                "Sistem alarmı $timeString için kuruluyor"
+                            } else {
+                                "Setting system alarm for $timeString"
+                            }
+                            ttsManager.speak(text, language)
+                        } else {
+                            val text = if (language == "tr") {
+                                "Saat uygulaması bulunamadı"
+                            } else {
+                                "Clock app not found"
+                            }
+                            ttsManager.speak(text, language)
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("AlarmHandler", "Sistem alarmı kurulamadı: ${e.message}", e)
+                        val text = if (language == "tr") {
+                            "Alarm kurulurken hata oluştu"
+                        } else {
+                            "Error setting alarm"
+                        }
+                        ttsManager.speak(text, language)
                     }
-                    
-                    // Alarm ID'yi daha küçük bir aralıkta tut (1-9999)
-                    val existingAlarms = loadAlarms()
-                    val maxId = existingAlarms.maxOfOrNull { it.id } ?: 0L
-                    val alarmId = if (maxId >= 9999) {
-                        // ID'ler dolduysa en küçük boş ID'yi bul
-                        val usedIds = existingAlarms.map { it.id }.toSet()
-                        (1L..9999L).firstOrNull { it !in usedIds } ?: 1L
-                    } else {
-                        maxId + 1
-                    }
-                    
-                    val intent = Intent(context, AlarmReceiver::class.java).apply {
-                        putExtra("alarm_time", timeString)
-                        putExtra("alarm_id", alarmId)
-                    }
-                    val pendingIntent = PendingIntent.getBroadcast(
-                        context,
-                        alarmId.toInt(),
-                        intent,
-                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                    )
-                    
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                        alarmManager.setExactAndAllowWhileIdle(
-                            AlarmManager.RTC_WAKEUP,
-                            calendar.timeInMillis,
-                            pendingIntent
-                        )
-                    } else {
-                        alarmManager.setExact(
-                            AlarmManager.RTC_WAKEUP,
-                            calendar.timeInMillis,
-                            pendingIntent
-                        )
-                    }
-                    
-                    // Alarm'ı listeye ekle
-                    val alarms = loadAlarms().toMutableList()
-                    alarms.add(AlarmData(alarmId, timeString, calendar.timeInMillis))
-                    saveAlarms(alarms)
-                    
-                    val text = if (language == "tr") {
-                        "Alarm $timeString için kuruldu"
-                    } else {
-                        "Alarm set for $timeString"
-                    }
-                    ttsManager.speak(text, language)
                 } else {
                     val text = if (language == "tr") {
                         "Alarm zamanı anlaşılamadı"
@@ -141,6 +71,7 @@ class AlarmHandler(private val context: Context) {
                     ttsManager.speak(text, language)
                 }
             } catch (e: Exception) {
+                android.util.Log.e("AlarmHandler", "Alarm kurma hatası: ${e.message}", e)
                 val text = if (language == "tr") {
                     "Alarm kurulurken hata oluştu"
                 } else {
@@ -152,17 +83,13 @@ class AlarmHandler(private val context: Context) {
     }
     
     fun handleListAlarms(ttsManager: TTSManager, language: String) {
-        val allAlarms = loadAlarms()
+        // Sistem alarmlarını oku - sadece aktif (enabled) olanları
+        val allSystemAlarms = systemAlarmHelper.getSystemAlarms()
+        val systemAlarms = allSystemAlarms.filter { it.enabled }
         
-        // Geçmiş alarmları temizle ve sadece gelecekteki alarmları göster
-        val activeAlarms = allAlarms.filter { it.timestamp > System.currentTimeMillis() }
+        android.util.Log.d("AlarmHandler", "Sistem alarmları: toplam=${allSystemAlarms.size}, aktif=${systemAlarms.size}")
         
-        // Eğer aktif alarm yoksa ama listede alarm varsa, geçmiş alarmları temizle
-        if (activeAlarms.size != allAlarms.size) {
-            saveAlarms(activeAlarms)
-        }
-        
-        if (activeAlarms.isEmpty()) {
+        if (systemAlarms.isEmpty()) {
             val text = if (language == "tr") {
                 "Kurulu alarm yok"
             } else {
@@ -172,29 +99,52 @@ class AlarmHandler(private val context: Context) {
             return
         }
         
-        val count = activeAlarms.size
-        val text = if (language == "tr") {
-            "$count alarm kurulu"
+        // Sistem alarmlarını oku
+        val systemCount = systemAlarms.size
+        val systemText = if (language == "tr") {
+            "Sistemde $systemCount alarm kurulu"
         } else {
-            "$count alarms set"
+            "$systemCount system alarms set"
         }
-        ttsManager.speak(text, language)
+        ttsManager.speak(systemText, language)
         
-        // Her alarmı sırayla oku
-        activeAlarms.sortedBy { it.timestamp }.forEachIndexed { index, alarm ->
+        systemAlarms.sortedBy { it.hour * 60 + it.minute }.forEachIndexed { index, alarm ->
+            val timeStr = systemAlarmHelper.formatAlarmTime(alarm.hour, alarm.minute)
+            val daysStr = systemAlarmHelper.formatAlarmDays(alarm.days, language)
+            val labelStr = alarm.label ?: ""
+            
             val alarmText = if (language == "tr") {
-                "${index + 1}. alarm saat ${alarm.time}"
+                "${index + 1}. alarm saat $timeStr"
             } else {
-                "Alarm ${index + 1} at ${alarm.time}"
+                "Alarm ${index + 1} at $timeStr"
             }
             ttsManager.speak(alarmText, language)
+            
+            if (labelStr.isNotEmpty()) {
+                val labelText = if (language == "tr") {
+                    "Etiket: $labelStr"
+                } else {
+                    "Label: $labelStr"
+                }
+                ttsManager.speak(labelText, language)
+            }
+            
+            if (alarm.days != 0) {
+                val daysText = if (language == "tr") {
+                    "Günler: $daysStr"
+                } else {
+                    "Days: $daysStr"
+                }
+                ttsManager.speak(daysText, language)
+            }
         }
     }
     
     fun handleCancelAlarms(ttsManager: TTSManager, language: String) {
-        val alarms = loadAlarms()
+        // Sistem alarmlarını kontrol et
+        val systemAlarms = systemAlarmHelper.getSystemAlarms().filter { it.enabled }
         
-        if (alarms.isEmpty()) {
+        if (systemAlarms.isEmpty()) {
             val text = if (language == "tr") {
                 "İptal edilecek alarm yok"
             } else {
@@ -204,30 +154,21 @@ class AlarmHandler(private val context: Context) {
             return
         }
         
-        // Tüm alarmları iptal et - PendingIntent'i aynı şekilde oluştur
         var cancelledCount = 0
-        alarms.forEach { alarm ->
-            try {
-                val intent = Intent(context, AlarmReceiver::class.java).apply {
-                    putExtra("alarm_time", alarm.time)
-                    putExtra("alarm_id", alarm.id)
-                }
-                val pendingIntent = PendingIntent.getBroadcast(
-                    context,
-                    alarm.id.toInt(),
-                    intent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-                alarmManager.cancel(pendingIntent)
-                pendingIntent.cancel() // Ekstra güvenlik için
+        
+        // Sistem alarmlarını devre dışı bırak (kapat)
+        systemAlarms.forEach { alarm ->
+            if (systemAlarmHelper.setSystemAlarmEnabled(alarm.id, false)) {
                 cancelledCount++
-            } catch (e: Exception) {
-                android.util.Log.e("AlarmHandler", "Alarm iptal edilirken hata: ${e.message}")
+                android.util.Log.d("AlarmHandler", "Alarm iptal edildi: id=${alarm.id}, saat=${alarm.hour}:${alarm.minute}")
+            } else {
+                // Devre dışı bırakma başarısız olursa, silmeyi dene
+                if (systemAlarmHelper.deleteSystemAlarm(alarm.id)) {
+                    cancelledCount++
+                    android.util.Log.d("AlarmHandler", "Alarm silindi: id=${alarm.id}, saat=${alarm.hour}:${alarm.minute}")
+                }
             }
         }
-        
-        // Listeyi temizle
-        saveAlarms(emptyList())
         
         val text = if (language == "tr") {
             "$cancelledCount alarm iptal edildi"

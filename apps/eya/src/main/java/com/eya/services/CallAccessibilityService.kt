@@ -8,14 +8,50 @@ import android.util.Log
 
 class CallAccessibilityService : AccessibilityService() {
     
+    private var lastYouTubeMusicEventTime = 0L
+    private var youtubeMusicPlayAttempted = false
+    
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
-        // Dialer açıldığında ve 112 numarası tuşlandığında "Ara" butonuna tıkla
         if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ||
             event.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
             val packageName = event.packageName?.toString() ?: return
             val className = event.className?.toString() ?: ""
             
             Log.d("CallAccessibility", "Event: package=$packageName, class=$className")
+            
+            // YouTube Music kontrolü
+            if (packageName == "com.google.android.apps.youtube.music") {
+                val currentTime = System.currentTimeMillis()
+                // Her 2 saniyede bir kontrol et
+                if (currentTime - lastYouTubeMusicEventTime > 2000) {
+                    lastYouTubeMusicEventTime = currentTime
+                    Log.d("CallAccessibility", "YouTube Music bulundu! Play butonunu arıyor...")
+                    // Arama sonuçları yüklendikten sonra play butonuna tıkla - birden fazla deneme
+                    if (!youtubeMusicPlayAttempted) {
+                        // İlk deneme: 2 saniye sonra
+                        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                            performYouTubeMusicPlayAction()
+                        }, 2000)
+                        
+                        // İkinci deneme: 4 saniye sonra
+                        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                            performYouTubeMusicPlayAction()
+                        }, 4000)
+                        
+                        // Üçüncü deneme: 6 saniye sonra
+                        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                            performYouTubeMusicPlayAction()
+                        }, 6000)
+                        
+                        youtubeMusicPlayAttempted = true
+                        // 15 saniye sonra flag'i sıfırla (yeni arama için)
+                        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                            youtubeMusicPlayAttempted = false
+                        }, 15000)
+                    }
+                }
+                return
+            }
             
             // Tüm dialer paket isimlerini kontrol et
             val dialerPackages = listOf(
@@ -146,6 +182,145 @@ class CallAccessibilityService : AccessibilityService() {
         }
     }
     
+    private fun performYouTubeMusicPlayAction() {
+        val rootNode = rootInActiveWindow ?: run {
+            Log.w("CallAccessibility", "rootInActiveWindow null (YouTube Music)")
+            return
+        }
+        
+        try {
+            Log.d("CallAccessibility", "YouTube Music Play butonu aranıyor...")
+            
+            // Tüm node'ları topla
+            val allNodes = mutableListOf<AccessibilityNodeInfo>()
+            collectAllNodes(rootNode, allNodes)
+            Log.d("CallAccessibility", "Toplam ${allNodes.size} node bulundu")
+            
+            // YouTube Music'te play butonunu veya ilk arama sonucunu bul
+            val playButtonTexts = listOf("Play", "Oynat", "Çal", "Başlat", "▶", "▶️", "Oynatma", "Playback")
+            val playKeywords = listOf("play", "oynat", "çal", "başlat", "start", "resume")
+            
+            // 1. Önce text ile ara
+            for (text in playButtonTexts) {
+                val playButtons = rootNode.findAccessibilityNodeInfosByText(text)
+                for (button in playButtons) {
+                    if (button.isClickable && button.isEnabled) {
+                        Log.d("CallAccessibility", "YouTube Music Play butonu bulundu (text): $text")
+                        button.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                        playButtons.forEach { if (it != button) it.recycle() }
+                        button.recycle()
+                        allNodes.forEach { it.recycle() }
+                        return
+                    }
+                }
+                playButtons.forEach { it.recycle() }
+            }
+            
+            // 2. Content description ve text ile ara (tüm node'larda)
+            var bestPlayButton: AccessibilityNodeInfo? = null
+            var maxPlayScore = 0
+            
+            for (node in allNodes) {
+                if (!node.isClickable || !node.isEnabled) continue
+                
+                val contentDesc = node.contentDescription?.toString()?.lowercase() ?: ""
+                val text = node.text?.toString()?.lowercase() ?: ""
+                val viewId = node.viewIdResourceName?.lowercase() ?: ""
+                
+                var score = 0
+                // Play kelimesi geçiyorsa yüksek puan
+                for (keyword in playKeywords) {
+                    if (contentDesc.contains(keyword)) score += 10
+                    if (text.contains(keyword)) score += 10
+                    if (viewId.contains(keyword)) score += 5
+                }
+                
+                // Button veya clickable içeriyorsa ekstra puan
+                if (viewId.contains("button") || viewId.contains("play") || viewId.contains("click")) {
+                    score += 5
+                }
+                
+                if (score > maxPlayScore) {
+                    maxPlayScore = score
+                    bestPlayButton = node
+                }
+            }
+            
+            if (bestPlayButton != null && maxPlayScore > 0) {
+                Log.d("CallAccessibility", "YouTube Music Play butonu bulundu (score: $maxPlayScore)")
+                bestPlayButton.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                allNodes.forEach { if (it != bestPlayButton) it.recycle() }
+                bestPlayButton.recycle()
+                return
+            }
+            
+            // 3. İlk tıklanabilir öğeyi bul (genellikle ilk arama sonucu)
+            val clickableNodes = mutableListOf<AccessibilityNodeInfo>()
+            findClickableNodes(rootNode, clickableNodes)
+            
+            Log.d("CallAccessibility", "Toplam ${clickableNodes.size} tıklanabilir öğe bulundu")
+            
+            // İlk birkaç tıklanabilir öğeyi dene (genellikle ilk arama sonucu)
+            for (i in 0 until minOf(5, clickableNodes.size)) {
+                val clickable = clickableNodes[i]
+                // Çok küçük butonları atla (genellikle menü butonları)
+                val bounds = android.graphics.Rect()
+                clickable.getBoundsInScreen(bounds)
+                val area = bounds.width() * bounds.height()
+                
+                if (area > 1000) { // Minimum alan kontrolü
+                    Log.d("CallAccessibility", "YouTube Music tıklanabilir öğe $i bulundu (alan: $area), tıklanıyor...")
+                    clickable.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                    clickableNodes.forEach { it.recycle() }
+                    allNodes.forEach { it.recycle() }
+                    return
+                }
+            }
+            
+            // Son çare: En büyük tıklanabilir öğeyi bul
+            var largestClickable: AccessibilityNodeInfo? = null
+            var maxArea = 0
+            
+            for (clickable in clickableNodes) {
+                val bounds = android.graphics.Rect()
+                clickable.getBoundsInScreen(bounds)
+                val area = bounds.width() * bounds.height()
+                
+                if (area > maxArea) {
+                    maxArea = area
+                    largestClickable = clickable
+                }
+            }
+            
+            if (largestClickable != null && maxArea > 500) {
+                Log.d("CallAccessibility", "YouTube Music en büyük tıklanabilir öğe bulundu (alan: $maxArea), tıklanıyor...")
+                largestClickable.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            } else {
+                Log.e("CallAccessibility", "YouTube Music Play butonu bulunamadı")
+            }
+            
+            clickableNodes.forEach { it.recycle() }
+            allNodes.forEach { it.recycle() }
+        } catch (e: Exception) {
+            Log.e("CallAccessibility", "YouTube Music Play butonu tıklanırken hata: ${e.message}", e)
+        } finally {
+            rootNode.recycle()
+        }
+    }
+    
+    private fun findClickableNodes(node: AccessibilityNodeInfo, result: MutableList<AccessibilityNodeInfo>) {
+        if (node.isClickable && node.isEnabled) {
+            result.add(node)
+        }
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i)
+            if (child != null) {
+                findClickableNodes(child, result)
+                child.recycle()
+            }
+        }
+    }
+    
     override fun onInterrupt() {
         // Servis kesildiğinde
     }
@@ -153,13 +328,17 @@ class CallAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         val info = AccessibilityServiceInfo().apply {
-            eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+            eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or 
+                        AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED or
+                        AccessibilityEvent.TYPE_VIEW_CLICKED or
+                        AccessibilityEvent.TYPE_VIEW_SCROLLED
             feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
-            flags = AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS
-            notificationTimeout = 100
+            flags = AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS or
+                   AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
+            notificationTimeout = 50 // Daha hızlı tepki için
         }
         setServiceInfo(info)
-        Log.d("CallAccessibility", "Accessibility Service bağlandı")
+        Log.d("CallAccessibility", "Accessibility Service bağlandı (YouTube Music desteği ile)")
     }
 }
 
