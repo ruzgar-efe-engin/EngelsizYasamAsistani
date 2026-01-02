@@ -1,16 +1,16 @@
 {
   "voices": [
-    { "id": "tr_male_1", "name": "TR Erkek 1", "language": "tr-TR" },
-    { "id": "tr_male_2", "name": "TR Erkek 2", "language": "tr-TR" },
-    { "id": "tr_male_3", "name": "TR Erkek 3", "language": "tr-TR" },
-    { "id": "tr_female_1", "name": "TR Kadın 1", "language": "tr-TR" },
-    { "id": "tr_female_2", "name": "TR Kadın 2", "language": "tr-TR" },
-    { "id": "en_male_1", "name": "EN Male 1", "language": "en-US" },
-    { "id": "en_male_2", "name": "EN Male 2", "language": "en-US" },
-    { "id": "en_female_1", "name": "EN Female 1", "language": "en-US" },
-    { "id": "en_female_2", "name": "EN Female 2", "language": "en-US" },
-    { "id": "en_female_3", "name": "EN Female 3", "language": "en-US" }
+    { "id": "aoede", "name": "Aoede (Kadın)", "language": "tr-TR", "provider": "gemini", "gender": "female" },
+    { "id": "charon", "name": "Charon (Kadın)", "language": "tr-TR", "provider": "gemini", "gender": "female" },
+    { "id": "fenrir", "name": "Fenrir (Kadın)", "language": "tr-TR", "provider": "gemini", "gender": "female" },
+    { "id": "kore", "name": "Kore (Kadın)", "language": "tr-TR", "provider": "gemini", "gender": "female" },
+    { "id": "pythia", "name": "Pythia (Kadın)", "language": "tr-TR", "provider": "gemini", "gender": "female" },
+    { "id": "achilles", "name": "Achilles (Erkek)", "language": "tr-TR", "provider": "gemini", "gender": "male" },
+    { "id": "fennel", "name": "Fennel (Erkek)", "language": "tr-TR", "provider": "gemini", "gender": "male" },
+    { "id": "nestor", "name": "Nestor (Erkek)", "language": "tr-TR", "provider": "gemini", "gender": "male" },
+    { "id": "orus", "name": "Orus (Erkek)", "language": "tr-TR", "provider": "gemini", "gender": "male" },
+    { "id": "zeus", "name": "Zeus (Erkek)", "language": "tr-TR", "provider": "gemini", "gender": "male" }
   ],
-  "defaultVoiceId": "tr_female_1"
+  "defaultVoiceId": "aoede"
 }
 

@@ -20,39 +20,58 @@ class YouTubeHandler(private val context: Context) {
             "com.google.android.youtube"
         }
         
-        // Uygulamanın kurulu olup olmadığını kontrol et
         val packageManager = context.packageManager
+        
+        // YouTube URL ile arama yap (uygulama kontrolü yapmadan direkt aç)
+        val searchUrl = if (isYouTubeMusic) {
+            "https://music.youtube.com/search?q=${Uri.encode(transcribedText)}"
+        } else {
+            "https://www.youtube.com/results?search_query=${Uri.encode(transcribedText)}"
+        }
+        
+        // Önce package ile açmayı dene
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            data = Uri.parse(searchUrl)
+            setPackage(packageName)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        
         try {
-            packageManager.getPackageInfo(packageName, 0)
-            
-            // Intent ile uygulamayı aç ve arama yap
-            val intent = Intent(Intent.ACTION_SEARCH).apply {
-                setPackage(packageName)
-                putExtra("query", transcribedText)
-            }
-            
-            // Eğer ACTION_SEARCH çalışmazsa, web URL ile dene
-            if (intent.resolveActivity(packageManager) == null) {
-                val webIntent = Intent(Intent.ACTION_VIEW).apply {
-                    data = Uri.parse("https://www.youtube.com/results?search_query=${Uri.encode(transcribedText)}")
-                    setPackage(packageName)
-                }
-                context.startActivity(webIntent)
-            } else {
+            // Package ile açmayı dene
+            if (intent.resolveActivity(packageManager) != null) {
                 context.startActivity(intent)
-            }
-            
-            val text = if (language == "tr") {
-                "Aranıyor ve oynatılıyor"
+                val text = if (language == "tr") {
+                    "Aranıyor ve oynatılıyor"
+                } else {
+                    "Searching and playing"
+                }
+                ttsManager.speak(text, language)
             } else {
-                "Searching and playing"
+                // Package yoksa, package olmadan aç (sistem uygun uygulamayı seçer)
+                val fallbackIntent = Intent(Intent.ACTION_VIEW, Uri.parse(searchUrl))
+                fallbackIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                if (fallbackIntent.resolveActivity(packageManager) != null) {
+                    context.startActivity(fallbackIntent)
+                    val text = if (language == "tr") {
+                        "Aranıyor ve oynatılıyor"
+                    } else {
+                        "Searching and playing"
+                    }
+                    ttsManager.speak(text, language)
+                } else {
+                    val text = if (language == "tr") {
+                        "YouTube açılamadı"
+                    } else {
+                        "Could not open YouTube"
+                    }
+                    ttsManager.speak(text, language)
+                }
             }
-            ttsManager.speak(text, language)
-        } catch (e: PackageManager.NameNotFoundException) {
+        } catch (e: Exception) {
             val text = if (language == "tr") {
-                "YouTube uygulaması bulunamadı, lütfen yükleyin"
+                "YouTube açılamadı"
             } else {
-                "YouTube app not found, please install it"
+                "Could not open YouTube"
             }
             ttsManager.speak(text, language)
         }

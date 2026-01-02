@@ -5,6 +5,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.database.Cursor
 import android.net.Uri
+import android.os.Build
+import android.os.PowerManager
 import android.provider.CallLog
 import android.provider.ContactsContract
 import androidx.core.content.ContextCompat
@@ -18,17 +20,88 @@ class CommunicationHandler(private val context: Context) {
     private val sttManager = SpeechToTextManager(context)
     
     fun handleCall112(ttsManager: TTSManager, language: String) {
-        val intent = Intent(Intent.ACTION_CALL).apply {
-            data = Uri.parse("tel:112")
+        if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.CALL_PHONE) != 
+            PackageManager.PERMISSION_GRANTED) {
+            val text = if (language == "tr") "Arama izni gerekli" else "Call permission required"
+            ttsManager.speak(text, language)
+            return
         }
         
-        if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.CALL_PHONE) == 
-            PackageManager.PERMISSION_GRANTED) {
+        try {
+            // Wake lock al (ekran kapalıysa aç)
+            val powerManager = context.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+            val wakeLock = powerManager.newWakeLock(
+                PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
+                "EYA::EmergencyCall"
+            )
+            wakeLock.acquire(10000) // 10 saniye
+            
+            // Keyguard'ı kaldır (Android 5.0+)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as android.app.KeyguardManager
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
+                    val activity = context as? android.app.Activity
+                    if (activity != null) {
+                        keyguardManager.requestDismissKeyguard(activity, null)
+                    }
+                }
+            }
+            
+            // ACTION_CALL yerine ACTION_DIAL kullan (daha güvenilir)
+            // Çünkü ACTION_CALL bazı cihazlarda Google ses servislerini açıyor
+            val intent = Intent(Intent.ACTION_DIAL).apply {
+                data = Uri.parse("tel:112")
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or 
+                       Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                       Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
+            
             context.startActivity(intent)
-            val text = if (language == "tr") "112 aranıyor" else "Calling 112"
+            
+            // Wake lock'ı serbest bırak (10 saniye sonra otomatik)
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                if (wakeLock.isHeld) {
+                    wakeLock.release()
+                }
+            }, 10000)
+            // Accessibility Service otomatik olarak "Ara" butonuna tıklayacak
+            val text = if (language == "tr") {
+                "112 aranıyor. Erişilebilirlik servisi aktifse otomatik arama başlatılacak"
+            } else {
+                "Calling 112. If accessibility service is active, call will start automatically"
+            }
             ttsManager.speak(text, language)
-        } else {
-            val text = if (language == "tr") "Arama izni gerekli" else "Call permission required"
+        } catch (e: android.content.ActivityNotFoundException) {
+            // ACTION_CALL desteklenmiyorsa ACTION_DIAL kullan
+            try {
+                val intent = Intent(Intent.ACTION_DIAL).apply {
+                    data = Uri.parse("tel:112")
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                context.startActivity(intent)
+                // Accessibility Service otomatik olarak "Ara" butonuna tıklayacak
+                val text = if (language == "tr") {
+                    "112 numarası tuşlandı. Erişilebilirlik servisi aktifse otomatik arama başlatılacak"
+                } else {
+                    "112 number dialed. If accessibility service is active, call will start automatically"
+                }
+                ttsManager.speak(text, language)
+            } catch (e2: Exception) {
+                val text = if (language == "tr") {
+                    "Arama başlatılamadı. Lütfen manuel olarak 112'yi arayın"
+                } else {
+                    "Could not start call. Please dial 112 manually"
+                }
+                ttsManager.speak(text, language)
+            }
+        } catch (e: Exception) {
+            // Bazı cihazlarda ACTION_CALL direkt arama yapmak yerine dialer açabilir
+            // Accessibility Service otomatik olarak "Ara" butonuna tıklayacak
+            val text = if (language == "tr") {
+                "112 numarası tuşlandı. Erişilebilirlik servisi aktifse otomatik arama başlatılacak"
+            } else {
+                "112 number dialed. If accessibility service is active, call will start automatically"
+            }
             ttsManager.speak(text, language)
         }
     }

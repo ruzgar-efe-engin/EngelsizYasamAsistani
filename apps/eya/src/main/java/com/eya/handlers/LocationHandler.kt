@@ -1,12 +1,14 @@
 package com.eya.handlers
 
 import android.content.Context
+import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.location.Address
 import android.location.Geocoder
+import androidx.core.content.ContextCompat
 import com.eya.TTSManager
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
@@ -28,6 +30,15 @@ class LocationHandler(private val context: Context) {
         language: String,
         onError: (String) -> Unit
     ) {
+        if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) != 
+            PackageManager.PERMISSION_GRANTED &&
+            ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_COARSE_LOCATION) != 
+            PackageManager.PERMISSION_GRANTED) {
+            val text = if (language == "tr") "Konum izni gerekli" else "Location permission required"
+            ttsManager.speak(text, language)
+            return
+        }
+        
         val scope = CoroutineScope(Dispatchers.Main)
         scope.launch {
             try {
@@ -124,6 +135,15 @@ class LocationHandler(private val context: Context) {
         language: String,
         onError: (String) -> Unit
     ) {
+        if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) != 
+            PackageManager.PERMISSION_GRANTED &&
+            ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_COARSE_LOCATION) != 
+            PackageManager.PERMISSION_GRANTED) {
+            val text = if (language == "tr") "Konum izni gerekli" else "Location permission required"
+            ttsManager.speak(text, language)
+            return
+        }
+        
         val scope = CoroutineScope(Dispatchers.Main)
         scope.launch {
             try {
@@ -134,28 +154,47 @@ class LocationHandler(private val context: Context) {
                 
                 if (location != null) {
                     val geocoder = Geocoder(context, Locale.getDefault())
-                    val addresses = geocoder.getFromLocation(
-                        location.latitude,
-                        location.longitude,
-                        5
-                    )
-                    
-                    if (addresses != null && addresses.isNotEmpty()) {
-                        val places = addresses.take(3).mapNotNull { addr ->
-                            addr.locality ?: addr.subLocality ?: addr.featureName
-                        }.distinct()
+                    try {
+                        val addresses = geocoder.getFromLocation(
+                            location.latitude,
+                            location.longitude,
+                            5
+                        )
                         
-                        val text = if (language == "tr") {
-                            "Çevrenizde: ${places.joinToString(", ")}"
+                        if (addresses != null && addresses.isNotEmpty()) {
+                            val places = addresses.take(3).mapNotNull { addr ->
+                                addr.locality ?: addr.subLocality ?: addr.featureName ?: addr.adminArea
+                            }.distinct().filter { it.isNotEmpty() }
+                            
+                            if (places.isNotEmpty()) {
+                                val text = if (language == "tr") {
+                                    "Çevrenizde: ${places.joinToString(", ")}"
+                                } else {
+                                    "Around you: ${places.joinToString(", ")}"
+                                }
+                                ttsManager.speak(text, language)
+                            } else {
+                                val text = if (language == "tr") {
+                                    "Çevrenizdeki yerler bulunamadı"
+                                } else {
+                                    "Could not find places around you"
+                                }
+                                ttsManager.speak(text, language)
+                            }
                         } else {
-                            "Around you: ${places.joinToString(", ")}"
+                            val text = if (language == "tr") {
+                                "Çevrenizdeki yerler bulunamadı"
+                            } else {
+                                "Could not find places around you"
+                            }
+                            ttsManager.speak(text, language)
                         }
-                        ttsManager.speak(text, language)
-                    } else {
+                    } catch (e: Exception) {
+                        // Geocoder hatası - basit mesaj ver
                         val text = if (language == "tr") {
-                            "Çevrenizdeki yerler bulunamadı"
+                            "Konum alındı: ${location.latitude}, ${location.longitude}"
                         } else {
-                            "Could not find places around you"
+                            "Location obtained: ${location.latitude}, ${location.longitude}"
                         }
                         ttsManager.speak(text, language)
                     }

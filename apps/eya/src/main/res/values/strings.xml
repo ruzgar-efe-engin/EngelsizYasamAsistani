@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="accessibility_service_description">Görme engelliler için acil durum aramalarını otomatik başlatmak için kullanılır. Dialer ekranında arama butonuna otomatik tıklar.</string>
+</resources>
+

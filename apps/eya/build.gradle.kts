@@ -45,9 +45,15 @@ android {
     val envApiKey = System.getenv("API_KEY") ?: ""
     val envOpenAIApiKey = System.getenv("OPENAI_API_KEY") ?: ""
     val localProps = Properties().apply {
-        val f = rootProject.file("local.properties")
+        // Önce apps/eya/local.properties'i dene, yoksa root'taki local.properties'i dene
+        val f = file("local.properties")
         if (f.exists()) {
             load(f.inputStream())
+        } else {
+            val rootF = rootProject.file("local.properties")
+            if (rootF.exists()) {
+                load(rootF.inputStream())
+            }
         }
     }
     val apiKey = if (envApiKey.isNotEmpty()) envApiKey else localProps.getProperty("API_KEY", "")

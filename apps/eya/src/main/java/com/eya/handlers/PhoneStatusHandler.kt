@@ -5,7 +5,9 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.media.AudioManager
 import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.BatteryManager
+import android.os.Build
 import com.eya.TTSManager
 
 class PhoneStatusHandler(private val context: Context) {
@@ -44,9 +46,25 @@ class PhoneStatusHandler(private val context: Context) {
     
     fun handleInternetStatus(ttsManager: TTSManager, language: String) {
         val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val networkInfo = connectivityManager.activeNetworkInfo
+        val isConnected = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val network = connectivityManager.activeNetwork
+            if (network != null) {
+                val capabilities = connectivityManager.getNetworkCapabilities(network)
+                capabilities != null && (
+                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
+                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+                )
+            } else {
+                false
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            val networkInfo = connectivityManager.activeNetworkInfo
+            networkInfo != null && networkInfo.isConnected
+        }
         
-        val text = if (networkInfo != null && networkInfo.isConnected) {
+        val text = if (isConnected) {
             if (language == "tr") {
                 "İnternet bağlantısı var"
             } else {

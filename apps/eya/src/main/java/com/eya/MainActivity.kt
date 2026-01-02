@@ -1,6 +1,11 @@
 package com.eya
 
+import android.content.Context
+import android.content.Intent
+import android.content.SharedPreferences
+import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -13,31 +18,200 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import com.eya.model.DeviceEvent
 import com.eya.model.EventType
 import com.eya.handlers.*
 import com.eya.utils.SpeechToTextManager
 import kotlinx.coroutines.launch
+import android.content.pm.PackageManager
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Kilit ekranında da çalışabilmek için
+        window.addFlags(
+            android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+            android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+            android.view.WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
+        )
+        
+        // Keyguard'ı kaldır (Android 5.0+)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+            val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as android.app.KeyguardManager
+            keyguardManager.requestDismissKeyguard(this, null)
+        }
+        
+        // BLE event'i intent'ten al (kilit ekranından geldiyse)
+        val bleEvent = intent.getStringExtra("ble_event")
+        if (bleEvent != null) {
+            Log.d("MainActivity", "BLE event intent'ten alındı: $bleEvent")
+            // Event'i işlemek için AppScreen'e ileteceğiz
+        }
+        
         setContent {
             AppScreen()
         }
+        
+        // BLE event'i işle (kilit ekranından geldiyse)
+        if (bleEvent != null) {
+            // Event'i işlemek için bir callback kullanacağız
+            // Şimdilik sadece log
+            Log.d("MainActivity", "BLE event işleniyor: $bleEvent")
+        }
+    }
+    
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        // Yeni intent geldiğinde (kilit ekranından)
+        val bleEvent = intent?.getStringExtra("ble_event")
+        if (bleEvent != null) {
+            Log.d("MainActivity", "Yeni BLE event alındı: $bleEvent")
+            // Event'i işle
+        }
+    }
+    
+    override fun onResume() {
+        super.onResume()
+        // Ekran açıldığında keyguard'ı kaldır
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
+            val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as android.app.KeyguardManager
+            keyguardManager.requestDismissKeyguard(this, null)
+        }
     }
 }
+
+// İzin bilgisi data class
+data class PermissionInfo(
+    val permission: String,
+    val name: String,
+    val reason: String
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppScreen() {
     val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("EYA_PREFS", Context.MODE_PRIVATE) }
+    
+    val requiredPermissionsInfo = remember {
+        mutableListOf<PermissionInfo>().apply {
+            add(PermissionInfo(
+                android.Manifest.permission.RECORD_AUDIO,
+                "Mikrofon",
+                "Bas-Konuş özelliği için gerekli"
+            ))
+            add(PermissionInfo(
+                android.Manifest.permission.ACCESS_FINE_LOCATION,
+                "Konum (Hassas)",
+                "Konum bilgisi ve hava durumu için gerekli"
+            ))
+            add(PermissionInfo(
+                android.Manifest.permission.ACCESS_COARSE_LOCATION,
+                "Konum (Yaklaşık)",
+                "Konum bilgisi için gerekli"
+            ))
+            add(PermissionInfo(
+                android.Manifest.permission.READ_CONTACTS,
+                "Kişiler",
+                "Rehberden arama için gerekli"
+            ))
+            add(PermissionInfo(
+                android.Manifest.permission.CALL_PHONE,
+                "Telefon Arama",
+                "112 ve kişi aramaları için gerekli"
+            ))
+            add(PermissionInfo(
+                android.Manifest.permission.SEND_SMS,
+                "SMS Gönderme",
+                "Acil durum mesajları için gerekli"
+            ))
+            add(PermissionInfo(
+                android.Manifest.permission.READ_CALL_LOG,
+                "Arama Geçmişi",
+                "Son arayanı arama için gerekli"
+            ))
+        }
+    }
+    
+    val requiredPermissions = remember {
+        requiredPermissionsInfo.map { it.permission }.toTypedArray()
+    }
+    
+    // İzin durumlarını takip et
+    val permissionStates = remember { mutableStateMapOf<String, Boolean>() }
+    val allPermissionsGranted = remember { 
+        derivedStateOf { 
+            requiredPermissionsInfo.all { permissionStates[it.permission] == true }
+        }
+    }
+    
+    // İzin durumlarını kontrol et ve sürekli güncelle
+    LaunchedEffect(Unit) {
+        while (true) {
+            requiredPermissionsInfo.forEach { info ->
+                permissionStates[info.permission] = ContextCompat.checkSelfPermission(
+                    context,
+                    info.permission
+                ) == PackageManager.PERMISSION_GRANTED
+            }
+            kotlinx.coroutines.delay(500) // Her 500ms'de bir kontrol et
+        }
+    }
+    
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions(),
+        onResult = { permissions ->
+            // İzin durumlarını güncelle
+            permissions.forEach { (permission, granted) ->
+                permissionStates[permission] = granted
+            }
+            prefs.edit().putBoolean("permissions_requested", true).apply()
+            
+            if (allPermissionsGranted.value) {
+                Log.d("EYA", "Tüm izinler verildi")
+            } else {
+                Log.w("EYA", "Bazı izinler eksik")
+            }
+        }
+    )
+    
+    // İlk açılışta izin kontrolü
+    LaunchedEffect(Unit) {
+        if (!prefs.getBoolean("permissions_requested", false) || !allPermissionsGranted.value) {
+            // İlk açılışta izin iste
+            if (!prefs.getBoolean("permissions_requested", false)) {
+                permissionLauncher.launch(requiredPermissions)
+            }
+        }
+    }
+    
+    // İzinler verilmeden uygulama devam etmesin
+    if (!allPermissionsGranted.value) {
+        PermissionRequestScreen(
+            onRequestPermissions = {
+                permissionLauncher.launch(requiredPermissions)
+            },
+            permissionInfo = requiredPermissionsInfo,
+            permissionStates = permissionStates,
+            language = "tr"
+        )
+        return
+    }
+    
     val bleManager = remember { BLEEventTransport(context) }
     val ttsManager = remember { TTSManager(context) }
     val menuManager = remember { MenuManager(context) }
@@ -54,6 +228,7 @@ fun AppScreen() {
     val phoneStatusHandler = remember { PhoneStatusHandler(context) }
     val securityHandler = remember { SecurityHandler(context) }
     val aiHandler = remember { AIHandler() }
+    val voiceHandler = remember { VoiceHandler(context) }
     
     // Menu navigation state
     var currentMainIndex by remember { mutableStateOf(0) }
@@ -70,10 +245,10 @@ fun AppScreen() {
     var panel3 by remember { mutableStateOf(true) }
     
     val scope = rememberCoroutineScope()
-
-    val permissionLauncher = rememberLauncherForActivityResult(
+    
+    val bluetoothPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
-        onResult = { Log.d("EYA", "İzin sonucu: $it") }
+        onResult = { Log.d("EYA", "Bluetooth izin sonucu: $it") }
     )
 
     // BLE callback: gelen event, bağlantı ve log
@@ -105,6 +280,7 @@ fun AppScreen() {
                     phoneStatusHandler = phoneStatusHandler,
                     securityHandler = securityHandler,
                     aiHandler = aiHandler,
+                    voiceHandler = voiceHandler,
                     sttManager = sttManager,
                     scope = scope,
                     onLog = { log ->
@@ -164,7 +340,7 @@ fun AppScreen() {
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = {
-                        permissionLauncher.launch(
+                        bluetoothPermissionLauncher.launch(
                             arrayOf(
                                 android.Manifest.permission.BLUETOOTH_SCAN,
                                 android.Manifest.permission.BLUETOOTH_CONNECT
@@ -247,6 +423,132 @@ fun AppScreen() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PermissionRequestScreen(
+    onRequestPermissions: () -> Unit,
+    permissionInfo: List<PermissionInfo>,
+    permissionStates: MutableMap<String, Boolean>,
+    language: String
+) {
+    Scaffold(
+        topBar = { TopAppBar(title = { Text("Engelsiz Yaşam Asistanı") }) }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .padding(16.dp)
+                .fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(
+                text = if (language == "tr") {
+                    "Uygulamanın çalışması için gerekli izinler"
+                } else {
+                    "Required permissions for the app"
+                },
+                style = MaterialTheme.typography.headlineSmall
+            )
+            
+            Text(
+                text = if (language == "tr") {
+                    "Lütfen tüm izinleri verin. Tüm izinler verilmeden uygulama kullanılamaz."
+                } else {
+                    "Please grant all permissions. The app cannot be used without all permissions."
+                },
+                style = MaterialTheme.typography.bodyMedium
+            )
+            
+            Divider()
+            
+            // İzin checklist
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(permissionInfo.size) { index ->
+                    val info = permissionInfo[index]
+                    val isGranted = permissionStates[info.permission] == true
+                    
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // Checkbox
+                        Checkbox(
+                            checked = isGranted,
+                            onCheckedChange = null,
+                            enabled = false
+                        )
+                        
+                        // İzin bilgisi
+                        Column(
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = info.name,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = if (isGranted) FontWeight.Normal else FontWeight.Bold
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = info.reason,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        
+                        // Durum ikonu
+                        Icon(
+                            imageVector = if (isGranted) {
+                                Icons.Default.CheckCircle
+                            } else {
+                                Icons.Default.Close
+                            },
+                            contentDescription = null,
+                            tint = if (isGranted) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.error
+                            }
+                        )
+                    }
+                }
+            }
+            
+            Divider()
+            
+            // İzin iste butonu
+            Button(
+                onClick = onRequestPermissions,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !permissionStates.values.all { it }
+            ) {
+                Text(if (language == "tr") "İzinleri İste" else "Request Permissions")
+            }
+        }
+    }
+}
+
+private fun checkAllPermissions(context: Context): Boolean {
+    val permissions = listOf(
+        android.Manifest.permission.RECORD_AUDIO,
+        android.Manifest.permission.ACCESS_FINE_LOCATION,
+        android.Manifest.permission.ACCESS_COARSE_LOCATION,
+        android.Manifest.permission.READ_CONTACTS,
+        android.Manifest.permission.CALL_PHONE,
+        android.Manifest.permission.SEND_SMS,
+        android.Manifest.permission.READ_CALL_LOG
+    )
+    
+    return permissions.all { permission ->
+        ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+    }
+}
+
 @Composable
 fun Panel(title: String, expanded: Boolean, onToggle: () -> Unit, content: @Composable () -> Unit) {
     Surface(
@@ -314,12 +616,17 @@ private fun handleDeviceEvent(
     phoneStatusHandler: PhoneStatusHandler,
     securityHandler: SecurityHandler,
     aiHandler: AIHandler,
+    voiceHandler: VoiceHandler,
     sttManager: SpeechToTextManager,
     scope: kotlinx.coroutines.CoroutineScope,
     onLog: (String) -> Unit
 ) {
     when (event.type) {
         EventType.MAIN_ROTATE -> {
+            // Radyo açıksa kapat
+            if (radioHandler.isPlaying()) {
+                radioHandler.stopRadio()
+            }
             val mainIndex = menuManager.normalize(event.mainIndex, menuManager.getMainMenuCount())
             onMainIndexChanged(mainIndex)
             val name = menuManager.getMainMenuName(mainIndex, language)
@@ -329,15 +636,30 @@ private fun handleDeviceEvent(
             }
         }
         EventType.SUB_ROTATE -> {
+            // Radyo açıksa kapat
+            if (radioHandler.isPlaying()) {
+                radioHandler.stopRadio()
+            }
             val subIndex = menuManager.normalize(event.subIndex, menuManager.getSubMenuCount(currentMainIndex))
             onSubIndexChanged(subIndex)
-            val name = menuManager.getSubMenuName(currentMainIndex, subIndex, language)
-            if (name != null) {
-                ttsManager.speak(name, language)
-                onLog("SUB_ROTATE -> $name")
+            
+            // Seslendirme menüsü için özel işlem
+            if (currentMainIndex == 11) {
+                voiceHandler.handleVoiceRotate(subIndex, language)
+                onLog("SUB_ROTATE -> Voice $subIndex")
+            } else {
+                val name = menuManager.getSubMenuName(currentMainIndex, subIndex, language)
+                if (name != null) {
+                    ttsManager.speak(name, language)
+                    onLog("SUB_ROTATE -> $name")
+                }
             }
         }
         EventType.CONFIRM -> {
+            // Radyo açıksa kapat
+            if (radioHandler.isPlaying()) {
+                radioHandler.stopRadio()
+            }
             handleMenuConfirm(
                 mainIndex = currentMainIndex,
                 subIndex = currentSubIndex,
@@ -353,21 +675,36 @@ private fun handleDeviceEvent(
                 radioHandler = radioHandler,
                 phoneStatusHandler = phoneStatusHandler,
                 securityHandler = securityHandler,
+                voiceHandler = voiceHandler,
                 onLog = onLog
             )
         }
         EventType.AI_PRESS -> {
+            // Radyo açıksa kapat
+            if (radioHandler.isPlaying()) {
+                radioHandler.stopRadio()
+            }
             val languageCode = if (language == "tr") "tr-TR" else "en-US"
-            sttManager.startRecording(languageCode)
-            onLog("AI_PRESS -> kayıt başlıyor")
+            val recordingStarted = sttManager.startRecording(languageCode)
+            if (!recordingStarted) {
+                val errorMsg = if (language == "tr") {
+                    "Ses kaydı başlatılamadı, mikrofon izni kontrol edin"
+                } else {
+                    "Could not start recording, check microphone permission"
+                }
+                ttsManager.speak(errorMsg, language)
+                onLog("AI_PRESS -> kayıt başlatılamadı")
+            } else {
+                onLog("AI_PRESS -> kayıt başlıyor")
+            }
         }
         EventType.AI_RELEASE -> {
             val languageCode = if (language == "tr") "tr-TR" else "en-US"
             scope.launch {
                 val transcribedText = sttManager.stopRecordingAndTranscribe(languageCode)
-                if (transcribedText != null && transcribedText.isNotEmpty()) {
+                if (transcribedText != null && transcribedText.isNotEmpty() && transcribedText.isNotBlank()) {
                     handleAIPressRelease(
-                        transcribedText = transcribedText,
+                        transcribedText = transcribedText.trim(),
                         mainIndex = currentMainIndex,
                         subIndex = currentSubIndex,
                         menuManager = menuManager,
@@ -381,12 +718,12 @@ private fun handleDeviceEvent(
                     )
                 } else {
                     val errorMsg = if (language == "tr") {
-                        "Ses anlaşılamadı"
+                        "Ses anlaşılamadı, lütfen tekrar deneyin"
                     } else {
-                        "Could not understand speech"
+                        "Could not understand speech, please try again"
                     }
                     ttsManager.speak(errorMsg, language)
-                    onLog("AI_RELEASE -> STT başarısız")
+                    onLog("AI_RELEASE -> STT başarısız veya boş")
                 }
             }
         }
@@ -414,6 +751,7 @@ private fun handleMenuConfirm(
     radioHandler: RadioHandler,
     phoneStatusHandler: PhoneStatusHandler,
     securityHandler: SecurityHandler,
+    voiceHandler: VoiceHandler,
     onLog: (String) -> Unit
 ) {
     when (mainIndex) {
@@ -430,12 +768,7 @@ private fun handleMenuConfirm(
             }
         }
         1 -> { // Hava Durumu
-            // Konum al ve hava durumu göster
-            locationHandler.handleCurrentLocation(ttsManager, language) { errorMsg ->
-                ttsManager.speak(errorMsg, language)
-            }
-            // Basit implementasyon: Mock konum kullan
-            weatherHandler.handleWeather(subIndex, 41.0082, 28.9784, ttsManager, language) { errorMsg ->
+            weatherHandler.handleWeather(subIndex, ttsManager, language) { errorMsg ->
                 ttsManager.speak(errorMsg, language)
             }
             onLog("CONFIRM -> Hava Durumu")
@@ -563,12 +896,11 @@ private fun handleMenuConfirm(
         9 -> { // Güvenlik
             when (subIndex) {
                 0 -> { // Acil Konum Gönder
-                    // Basit implementasyon: Varsayılan acil kişi
-                    securityHandler.handleSendEmergencyLocation("112", ttsManager, language)
+                    securityHandler.handleSendEmergencyLocation(ttsManager, language)
                     onLog("CONFIRM -> Acil Konum")
                 }
                 1 -> { // "Güvendeyim" Mesajı
-                    securityHandler.handleSendSafeMessage("112", ttsManager, language)
+                    securityHandler.handleSendSafeMessage(ttsManager, language)
                     onLog("CONFIRM -> Güvendeyim")
                 }
                 2 -> { // Yardım Çağrısı
@@ -576,7 +908,7 @@ private fun handleMenuConfirm(
                     onLog("CONFIRM -> Yardım Çağrısı")
                 }
                 3 -> { // Sürekli Konum Paylaş
-                    securityHandler.handleShareLocationContinuously("112", ttsManager, language)
+                    securityHandler.handleShareLocationContinuously(ttsManager, language)
                     onLog("CONFIRM -> Sürekli Konum")
                 }
             }
@@ -593,6 +925,10 @@ private fun handleMenuConfirm(
                     onLog("CONFIRM -> AI Bas-Konuş beklemede")
                 }
             }
+        }
+        11 -> { // Seslendirme
+            voiceHandler.handleVoiceSelection(subIndex, language)
+            onLog("CONFIRM -> Ses Seçildi: $subIndex")
         }
     }
 }

@@ -98,6 +98,22 @@
         { "id": 0, "name": { "tr": "Gemini ile Bas-Konuş", "en": "Push-to-Talk with Gemini" } },
         { "id": 1, "name": { "tr": "ChatGPT ile Bas-Konuş", "en": "Push-to-Talk with ChatGPT" } }
       ]
+    },
+    {
+      "id": 11,
+      "name": { "tr": "Seslendirme", "en": "Voiceover" },
+      "subMenus": [
+        { "id": 0, "name": { "tr": "Aoede (Kadın)", "en": "Aoede (Female)" } },
+        { "id": 1, "name": { "tr": "Charon (Kadın)", "en": "Charon (Female)" } },
+        { "id": 2, "name": { "tr": "Fenrir (Kadın)", "en": "Fenrir (Female)" } },
+        { "id": 3, "name": { "tr": "Kore (Kadın)", "en": "Kore (Female)" } },
+        { "id": 4, "name": { "tr": "Pythia (Kadın)", "en": "Pythia (Female)" } },
+        { "id": 5, "name": { "tr": "Achilles (Erkek)", "en": "Achilles (Male)" } },
+        { "id": 6, "name": { "tr": "Fennel (Erkek)", "en": "Fennel (Male)" } },
+        { "id": 7, "name": { "tr": "Nestor (Erkek)", "en": "Nestor (Male)" } },
+        { "id": 8, "name": { "tr": "Orus (Erkek)", "en": "Orus (Male)" } },
+        { "id": 9, "name": { "tr": "Zeus (Erkek)", "en": "Zeus (Male)" } }
+      ]
     }
   ]
 }

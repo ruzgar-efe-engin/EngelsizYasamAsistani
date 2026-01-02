@@ -2,6 +2,7 @@ package com.eya.utils
 
 import android.content.Context
 import android.media.MediaRecorder
+import androidx.core.content.ContextCompat
 import com.eya.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -12,6 +13,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.File
 import android.util.Base64
+import android.content.pm.PackageManager
 
 class SpeechToTextManager(private val context: Context) {
     private var mediaRecorder: MediaRecorder? = null
@@ -23,6 +25,18 @@ class SpeechToTextManager(private val context: Context) {
     fun startRecording(language: String = "tr-TR"): Boolean {
         if (isRecording) {
             return false
+        }
+        
+        // İzin kontrolü
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            if (ContextCompat.checkSelfPermission(
+                    context,
+                    android.Manifest.permission.RECORD_AUDIO
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                android.util.Log.e("STT", "RECORD_AUDIO izni yok")
+                return false
+            }
         }
         
         try {
@@ -44,8 +58,10 @@ class SpeechToTextManager(private val context: Context) {
             }
             
             isRecording = true
+            android.util.Log.d("STT", "Kayıt başladı")
             return true
         } catch (e: Exception) {
+            android.util.Log.e("STT", "Kayıt başlatma hatası: ${e.message}")
             e.printStackTrace()
             return false
         }

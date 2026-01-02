@@ -6,13 +6,17 @@ import com.eya.TTSManager
 class RadioHandler {
     private var mediaPlayer: MediaPlayer? = null
     
-    // Radyo stream URL'leri
+    // Radyo stream URL'leri (düzeltilmiş)
     private val radioStreams = mapOf(
         0 to "https://radio-trt-fm.live.trt.com.tr/master.m3u8", // TRT FM
         1 to "https://listen.powerapp.com.tr/powerfm/mpeg/icecast.audio", // Power FM
-        2 to "https://stream.live.vc.bbcmedia.co.uk/bbc_radio_one", // BBC Radio 1
+        2 to "https://stream.live.vc.bbcmedia.co.uk/bbc_radio_one.m3u8", // BBC Radio 1
         3 to "https://npr-ice.streamguys1.com/live.mp3" // NPR
     )
+    
+    fun isPlaying(): Boolean {
+        return mediaPlayer?.isPlaying ?: false
+    }
     
     private val radioNames = mapOf(
         0 to "TRT FM",
