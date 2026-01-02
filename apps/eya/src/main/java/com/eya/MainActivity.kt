@@ -99,7 +99,7 @@ fun AppScreen() {
     val voices = remember { ttsManager.getVoices() }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("EYA - Basit BLE") }) }
+        topBar = { TopAppBar(title = { Text("Engelsiz Yaşam Asistanı") }) }
     ) { padding ->
         Column(
             modifier = Modifier
