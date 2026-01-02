@@ -36,5 +36,18 @@ class MenuManager(context: Context) {
         val nameObj = sub.getJSONObject("name")
         return nameObj.optString(language, nameObj.optString("tr"))
     }
+    
+    fun getMainMenuCount(): Int {
+        val mainMenus = menuJson.getJSONArray("mainMenus")
+        return mainMenus.length()
+    }
+    
+    fun getSubMenuCount(mainIndex: Int): Int {
+        val mainMenus = menuJson.getJSONArray("mainMenus")
+        val idx = normalize(mainIndex, mainMenus.length())
+        val main = mainMenus.getJSONObject(idx)
+        val subMenus = main.getJSONArray("subMenus")
+        return subMenus.length()
+    }
 }
 

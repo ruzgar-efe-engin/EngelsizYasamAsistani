@@ -43,6 +43,7 @@ android {
 
     // BuildConfig için API_KEY okuma (öncelik: env -> local.properties)
     val envApiKey = System.getenv("API_KEY") ?: ""
+    val envOpenAIApiKey = System.getenv("OPENAI_API_KEY") ?: ""
     val localProps = Properties().apply {
         val f = rootProject.file("local.properties")
         if (f.exists()) {
@@ -50,8 +51,10 @@ android {
         }
     }
     val apiKey = if (envApiKey.isNotEmpty()) envApiKey else localProps.getProperty("API_KEY", "")
+    val openAIApiKey = if (envOpenAIApiKey.isNotEmpty()) envOpenAIApiKey else localProps.getProperty("OPENAI_API_KEY", "")
     buildTypes.all {
         buildConfigField("String", "API_KEY", "\"$apiKey\"")
+        buildConfigField("String", "OPENAI_API_KEY", "\"$openAIApiKey\"")
     }
 }
 
@@ -70,11 +73,15 @@ dependencies {
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
 
     // JSON
     implementation("org.json:json:20240303")
 
     // OkHttp (basit HTTP çağrıları için)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    
+    // Google Play Services Location
+    implementation("com.google.android.gms:play-services-location:21.0.1")
 }
 

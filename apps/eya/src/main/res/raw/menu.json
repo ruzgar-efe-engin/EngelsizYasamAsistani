@@ -50,14 +50,14 @@
       "id": 5,
       "name": { "tr": "YouTube", "en": "YouTube" },
       "subMenus": [
-        { "id": 0, "name": { "tr": "Bas-Konuş Arama Söyle → Oynat", "en": "Push-to-Talk: Search and Play" } }
+        { "id": 0, "name": { "tr": "Bas-Konuş Ara ve Oynat", "en": "Push-to-Talk: Search and Play" } }
       ]
     },
     {
       "id": 6,
       "name": { "tr": "YouTube Music", "en": "YouTube Music" },
       "subMenus": [
-        { "id": 0, "name": { "tr": "Bas-Konuş Arama Söyle → Oynat", "en": "Push-to-Talk: Search and Play" } },
+        { "id": 0, "name": { "tr": "Bas-Konuş Ara ve Oynat", "en": "Push-to-Talk: Search and Play" } },
         { "id": 1, "name": { "tr": "Rasgele Rock Müzik", "en": "Random Rock Music" } },
         { "id": 2, "name": { "tr": "Rasgele Klasik Müzik", "en": "Random Classical Music" } }
       ]

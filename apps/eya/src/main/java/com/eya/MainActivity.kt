@@ -21,6 +21,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import com.eya.model.DeviceEvent
 import com.eya.model.EventType
+import com.eya.handlers.*
+import com.eya.utils.SpeechToTextManager
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -38,6 +41,23 @@ fun AppScreen() {
     val bleManager = remember { BLEEventTransport(context) }
     val ttsManager = remember { TTSManager(context) }
     val menuManager = remember { MenuManager(context) }
+    val sttManager = remember { SpeechToTextManager(context) }
+    
+    // Handler'lar
+    val timeHandler = remember { TimeHandler(context) }
+    val weatherHandler = remember { WeatherHandler(context) }
+    val locationHandler = remember { LocationHandler(context) }
+    val communicationHandler = remember { CommunicationHandler(context) }
+    val alarmHandler = remember { AlarmHandler(context) }
+    val youtubeHandler = remember { YouTubeHandler(context) }
+    val radioHandler = remember { RadioHandler() }
+    val phoneStatusHandler = remember { PhoneStatusHandler(context) }
+    val securityHandler = remember { SecurityHandler(context) }
+    val aiHandler = remember { AIHandler() }
+    
+    // Menu navigation state
+    var currentMainIndex by remember { mutableStateOf(0) }
+    var currentSubIndex by remember { mutableStateOf(0) }
 
     var connected by remember { mutableStateOf(false) }
     var language by remember { mutableStateOf("tr") }
@@ -48,6 +68,8 @@ fun AppScreen() {
     var panel1 by remember { mutableStateOf(true) }
     var panel2 by remember { mutableStateOf(true) }
     var panel3 by remember { mutableStateOf(true) }
+    
+    val scope = rememberCoroutineScope()
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
@@ -64,9 +86,31 @@ fun AppScreen() {
         bleManager.onEventReceived = { json ->
             val event = DeviceEvent.fromJson(json)
             if (event != null) {
-                handleDeviceEvent(event, menuManager, ttsManager, language, onLog = { log ->
-                    eventLogs = (eventLogs + log).takeLast(50)
-                })
+                handleDeviceEvent(
+                    event = event,
+                    menuManager = menuManager,
+                    ttsManager = ttsManager,
+                    language = language,
+                    currentMainIndex = currentMainIndex,
+                    currentSubIndex = currentSubIndex,
+                    onMainIndexChanged = { currentMainIndex = it },
+                    onSubIndexChanged = { currentSubIndex = it },
+                    timeHandler = timeHandler,
+                    weatherHandler = weatherHandler,
+                    locationHandler = locationHandler,
+                    communicationHandler = communicationHandler,
+                    alarmHandler = alarmHandler,
+                    youtubeHandler = youtubeHandler,
+                    radioHandler = radioHandler,
+                    phoneStatusHandler = phoneStatusHandler,
+                    securityHandler = securityHandler,
+                    aiHandler = aiHandler,
+                    sttManager = sttManager,
+                    scope = scope,
+                    onLog = { log ->
+                        eventLogs = (eventLogs + log).takeLast(50)
+                    }
+                )
             }
         }
         bleManager.onConnectionChanged = {
@@ -256,37 +300,364 @@ private fun handleDeviceEvent(
     menuManager: MenuManager,
     ttsManager: TTSManager,
     language: String,
+    currentMainIndex: Int,
+    currentSubIndex: Int,
+    onMainIndexChanged: (Int) -> Unit,
+    onSubIndexChanged: (Int) -> Unit,
+    timeHandler: TimeHandler,
+    weatherHandler: WeatherHandler,
+    locationHandler: LocationHandler,
+    communicationHandler: CommunicationHandler,
+    alarmHandler: AlarmHandler,
+    youtubeHandler: YouTubeHandler,
+    radioHandler: RadioHandler,
+    phoneStatusHandler: PhoneStatusHandler,
+    securityHandler: SecurityHandler,
+    aiHandler: AIHandler,
+    sttManager: SpeechToTextManager,
+    scope: kotlinx.coroutines.CoroutineScope,
     onLog: (String) -> Unit
 ) {
     when (event.type) {
         EventType.MAIN_ROTATE -> {
-            val name = menuManager.getMainMenuName(event.mainIndex, language)
+            val mainIndex = menuManager.normalize(event.mainIndex, menuManager.getMainMenuCount())
+            onMainIndexChanged(mainIndex)
+            val name = menuManager.getMainMenuName(mainIndex, language)
             if (name != null) {
                 ttsManager.speak(name, language)
                 onLog("MAIN_ROTATE -> $name")
             }
         }
         EventType.SUB_ROTATE -> {
-            val name = menuManager.getSubMenuName(event.mainIndex, event.subIndex, language)
+            val subIndex = menuManager.normalize(event.subIndex, menuManager.getSubMenuCount(currentMainIndex))
+            onSubIndexChanged(subIndex)
+            val name = menuManager.getSubMenuName(currentMainIndex, subIndex, language)
             if (name != null) {
                 ttsManager.speak(name, language)
                 onLog("SUB_ROTATE -> $name")
             }
         }
         EventType.CONFIRM -> {
-            // Basit if/else ile aksiyonlar (çocuklar için okunur)
-            onLog("CONFIRM -> aksiyon çalıştır")
-            ttsManager.speak("Tamamlandı", language)
+            handleMenuConfirm(
+                mainIndex = currentMainIndex,
+                subIndex = currentSubIndex,
+                menuManager = menuManager,
+                ttsManager = ttsManager,
+                language = language,
+                timeHandler = timeHandler,
+                weatherHandler = weatherHandler,
+                locationHandler = locationHandler,
+                communicationHandler = communicationHandler,
+                alarmHandler = alarmHandler,
+                youtubeHandler = youtubeHandler,
+                radioHandler = radioHandler,
+                phoneStatusHandler = phoneStatusHandler,
+                securityHandler = securityHandler,
+                onLog = onLog
+            )
         }
         EventType.AI_PRESS -> {
+            val languageCode = if (language == "tr") "tr-TR" else "en-US"
+            sttManager.startRecording(languageCode)
             onLog("AI_PRESS -> kayıt başlıyor")
         }
         EventType.AI_RELEASE -> {
-            onLog("AI_RELEASE -> kayıt durdu, STT/LLM/TTS çalışacak (basit placeholder)")
-            ttsManager.speak("Yanıt hazırlandı", language)
+            val languageCode = if (language == "tr") "tr-TR" else "en-US"
+            scope.launch {
+                val transcribedText = sttManager.stopRecordingAndTranscribe(languageCode)
+                if (transcribedText != null && transcribedText.isNotEmpty()) {
+                    handleAIPressRelease(
+                        transcribedText = transcribedText,
+                        mainIndex = currentMainIndex,
+                        subIndex = currentSubIndex,
+                        menuManager = menuManager,
+                        ttsManager = ttsManager,
+                        language = language,
+                        communicationHandler = communicationHandler,
+                        alarmHandler = alarmHandler,
+                        youtubeHandler = youtubeHandler,
+                        aiHandler = aiHandler,
+                        onLog = onLog
+                    )
+                } else {
+                    val errorMsg = if (language == "tr") {
+                        "Ses anlaşılamadı"
+                    } else {
+                        "Could not understand speech"
+                    }
+                    ttsManager.speak(errorMsg, language)
+                    onLog("AI_RELEASE -> STT başarısız")
+                }
+            }
         }
         EventType.EVENT_CANCEL -> {
+            sttManager.cancelRecording()
             onLog("EVENT_CANCEL -> iptal edildi")
+            val text = if (language == "tr") "İptal edildi" else "Cancelled"
+            ttsManager.speak(text, language)
+        }
+    }
+}
+
+private fun handleMenuConfirm(
+    mainIndex: Int,
+    subIndex: Int,
+    menuManager: MenuManager,
+    ttsManager: TTSManager,
+    language: String,
+    timeHandler: TimeHandler,
+    weatherHandler: WeatherHandler,
+    locationHandler: LocationHandler,
+    communicationHandler: CommunicationHandler,
+    alarmHandler: AlarmHandler,
+    youtubeHandler: YouTubeHandler,
+    radioHandler: RadioHandler,
+    phoneStatusHandler: PhoneStatusHandler,
+    securityHandler: SecurityHandler,
+    onLog: (String) -> Unit
+) {
+    when (mainIndex) {
+        0 -> { // Zaman
+            when (subIndex) {
+                0 -> { // Saat
+                    timeHandler.handleSaat(ttsManager, language)
+                    onLog("CONFIRM -> Saat")
+                }
+                1 -> { // Tarih
+                    timeHandler.handleTarih(ttsManager, language)
+                    onLog("CONFIRM -> Tarih")
+                }
+            }
+        }
+        1 -> { // Hava Durumu
+            // Konum al ve hava durumu göster
+            locationHandler.handleCurrentLocation(ttsManager, language) { errorMsg ->
+                ttsManager.speak(errorMsg, language)
+            }
+            // Basit implementasyon: Mock konum kullan
+            weatherHandler.handleWeather(subIndex, 41.0082, 28.9784, ttsManager, language) { errorMsg ->
+                ttsManager.speak(errorMsg, language)
+            }
+            onLog("CONFIRM -> Hava Durumu")
+        }
+        2 -> { // Konum
+            when (subIndex) {
+                0 -> { // Mevcut Konum
+                    locationHandler.handleCurrentLocation(ttsManager, language) { errorMsg ->
+                        ttsManager.speak(errorMsg, language)
+                    }
+                    onLog("CONFIRM -> Mevcut Konum")
+                }
+                1 -> { // Hangi Yöne Bakıyorum
+                    locationHandler.handleDirection(ttsManager, language) { errorMsg ->
+                        ttsManager.speak(errorMsg, language)
+                    }
+                    onLog("CONFIRM -> Yön")
+                }
+                2 -> { // Çevremde Ne Var
+                    locationHandler.handleNearby(ttsManager, language) { errorMsg ->
+                        ttsManager.speak(errorMsg, language)
+                    }
+                    onLog("CONFIRM -> Çevre")
+                }
+            }
+        }
+        3 -> { // İletişim
+            when (subIndex) {
+                0 -> { // 112'yi Ara
+                    communicationHandler.handleCall112(ttsManager, language)
+                    onLog("CONFIRM -> 112 Ara")
+                }
+                1 -> { // Son Arayanı Ara
+                    communicationHandler.handleCallLastCaller(ttsManager, language)
+                    onLog("CONFIRM -> Son Arayan")
+                }
+                2, 3 -> { // Bas-Konuş özellikleri - AI_RELEASE'de işlenecek
+                    val text = if (language == "tr") {
+                        "Lütfen butona basılı tutarak konuşun"
+                    } else {
+                        "Please hold the button and speak"
+                    }
+                    ttsManager.speak(text, language)
+                    onLog("CONFIRM -> Bas-Konuş beklemede")
+                }
+            }
+        }
+        4 -> { // Alarm
+            when (subIndex) {
+                0 -> { // Alarm Kur (Bas-Konuş) - AI_RELEASE'de işlenecek
+                    val text = if (language == "tr") {
+                        "Lütfen butona basılı tutarak alarm zamanını söyleyin"
+                    } else {
+                        "Please hold the button and say the alarm time"
+                    }
+                    ttsManager.speak(text, language)
+                    onLog("CONFIRM -> Alarm Kur beklemede")
+                }
+                1 -> { // Alarmları Say
+                    alarmHandler.handleListAlarms(ttsManager, language)
+                    onLog("CONFIRM -> Alarmları Say")
+                }
+                2 -> { // Alarm İptal Et
+                    alarmHandler.handleCancelAlarms(ttsManager, language)
+                    onLog("CONFIRM -> Alarm İptal")
+                }
+            }
+        }
+        5 -> { // YouTube
+            when (subIndex) {
+                0 -> { // Bas-Konuş Ara ve Oynat - AI_RELEASE'de işlenecek
+                    val text = if (language == "tr") {
+                        "Lütfen butona basılı tutarak arama yapın"
+                    } else {
+                        "Please hold the button and search"
+                    }
+                    ttsManager.speak(text, language)
+                    onLog("CONFIRM -> YouTube Bas-Konuş beklemede")
+                }
+            }
+        }
+        6 -> { // YouTube Music
+            when (subIndex) {
+                0 -> { // Bas-Konuş Ara ve Oynat - AI_RELEASE'de işlenecek
+                    val text = if (language == "tr") {
+                        "Lütfen butona basılı tutarak arama yapın"
+                    } else {
+                        "Please hold the button and search"
+                    }
+                    ttsManager.speak(text, language)
+                    onLog("CONFIRM -> YouTube Music Bas-Konuş beklemede")
+                }
+                1 -> { // Rasgele Rock Müzik
+                    youtubeHandler.handleRandomRock(ttsManager, language)
+                    onLog("CONFIRM -> Rock Müzik")
+                }
+                2 -> { // Rasgele Klasik Müzik
+                    youtubeHandler.handleRandomClassical(ttsManager, language)
+                    onLog("CONFIRM -> Klasik Müzik")
+                }
+            }
+        }
+        7 -> { // Radyo
+            radioHandler.playRadio(subIndex, ttsManager, language) { errorMsg ->
+                ttsManager.speak(errorMsg, language)
+            }
+            onLog("CONFIRM -> Radyo $subIndex")
+        }
+        8 -> { // Telefon Durumu
+            when (subIndex) {
+                0 -> { // Şarj Kaç
+                    phoneStatusHandler.handleBatteryLevel(ttsManager, language)
+                    onLog("CONFIRM -> Şarj")
+                }
+                1 -> { // İnternet Var mı
+                    phoneStatusHandler.handleInternetStatus(ttsManager, language)
+                    onLog("CONFIRM -> İnternet")
+                }
+                2 -> { // Sessizde mi
+                    phoneStatusHandler.handleSilentMode(ttsManager, language)
+                    onLog("CONFIRM -> Sessiz Mod")
+                }
+            }
+        }
+        9 -> { // Güvenlik
+            when (subIndex) {
+                0 -> { // Acil Konum Gönder
+                    // Basit implementasyon: Varsayılan acil kişi
+                    securityHandler.handleSendEmergencyLocation("112", ttsManager, language)
+                    onLog("CONFIRM -> Acil Konum")
+                }
+                1 -> { // "Güvendeyim" Mesajı
+                    securityHandler.handleSendSafeMessage("112", ttsManager, language)
+                    onLog("CONFIRM -> Güvendeyim")
+                }
+                2 -> { // Yardım Çağrısı
+                    securityHandler.handleStartHelpCall(ttsManager, language)
+                    onLog("CONFIRM -> Yardım Çağrısı")
+                }
+                3 -> { // Sürekli Konum Paylaş
+                    securityHandler.handleShareLocationContinuously("112", ttsManager, language)
+                    onLog("CONFIRM -> Sürekli Konum")
+                }
+            }
+        }
+        10 -> { // Yapay Zeka
+            when (subIndex) {
+                0, 1 -> { // Bas-Konuş - AI_RELEASE'de işlenecek
+                    val text = if (language == "tr") {
+                        "Lütfen butona basılı tutarak sorunuzu sorun"
+                    } else {
+                        "Please hold the button and ask your question"
+                    }
+                    ttsManager.speak(text, language)
+                    onLog("CONFIRM -> AI Bas-Konuş beklemede")
+                }
+            }
+        }
+    }
+}
+
+private fun handleAIPressRelease(
+    transcribedText: String,
+    mainIndex: Int,
+    subIndex: Int,
+    menuManager: MenuManager,
+    ttsManager: TTSManager,
+    language: String,
+    communicationHandler: CommunicationHandler,
+    alarmHandler: AlarmHandler,
+    youtubeHandler: YouTubeHandler,
+    aiHandler: AIHandler,
+    onLog: (String) -> Unit
+) {
+    when (mainIndex) {
+        3 -> { // İletişim
+            when (subIndex) {
+                2 -> { // Bas-Konuş Rehberden İsim
+                    communicationHandler.handleCallByName(transcribedText, ttsManager, language)
+                    onLog("AI_RELEASE -> Rehberden Ara: $transcribedText")
+                }
+                3 -> { // Bas-Konuş Numara
+                    communicationHandler.handleCallByNumber(transcribedText, ttsManager, language)
+                    onLog("AI_RELEASE -> Numara Ara: $transcribedText")
+                }
+            }
+        }
+        4 -> { // Alarm
+            when (subIndex) {
+                0 -> { // Alarm Kur
+                    alarmHandler.handleSetAlarm(transcribedText, ttsManager, language)
+                    onLog("AI_RELEASE -> Alarm Kur: $transcribedText")
+                }
+            }
+        }
+        5 -> { // YouTube
+            when (subIndex) {
+                0 -> { // Bas-Konuş Ara ve Oynat
+                    youtubeHandler.handleSearchAndPlay(transcribedText, false, ttsManager, language)
+                    onLog("AI_RELEASE -> YouTube Ara: $transcribedText")
+                }
+            }
+        }
+        6 -> { // YouTube Music
+            when (subIndex) {
+                0 -> { // Bas-Konuş Ara ve Oynat
+                    youtubeHandler.handleSearchAndPlay(transcribedText, true, ttsManager, language)
+                    onLog("AI_RELEASE -> YouTube Music Ara: $transcribedText")
+                }
+            }
+        }
+        10 -> { // Yapay Zeka
+            when (subIndex) {
+                0 -> { // Gemini ile Bas-Konuş
+                    aiHandler.handleGeminiChat(transcribedText, ttsManager, language)
+                    onLog("AI_RELEASE -> Gemini: $transcribedText")
+                }
+                1 -> { // ChatGPT ile Bas-Konuş
+                    aiHandler.handleChatGPTChat(transcribedText, ttsManager, language)
+                    onLog("AI_RELEASE -> ChatGPT: $transcribedText")
+                }
+            }
         }
     }
 }
