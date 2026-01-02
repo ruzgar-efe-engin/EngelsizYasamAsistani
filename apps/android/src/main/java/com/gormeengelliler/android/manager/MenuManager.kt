@@ -68,7 +68,8 @@ class MenuManager(private val context: Context) {
         EventLogManager.logMenu("✅ Menu yapısı mevcut", "Toplam ${structure.mainMenus.size} ana menu var")
         EventLogManager.logMenu("Adım 2: Mevcut main menu ID'leri", "${structure.mainMenus.map { it.id }}")
         
-        EventLogManager.logMenu("Adım 3: mainIndex=$mainIndex ile menu aranıyor", "find() çağrılıyor")
+        // NOT: Normalizasyon DeviceEventService'te yapılıyor, burada direkt kullanıyoruz
+        EventLogManager.logMenu("Adım 3: mainIndex=$mainIndex ile menu aranıyor (normalizasyon zaten yapıldı)", "find() çağrılıyor")
         val mainMenu = structure.mainMenus.find { it.id == mainIndex }
         if (mainMenu == null) {
             EventLogManager.logMenu("❌ HATA: Main menu bulunamadı", "mainIndex=$mainIndex, mevcut ID'ler: ${structure.mainMenus.map { it.id }}", true)
@@ -101,7 +102,8 @@ class MenuManager(private val context: Context) {
         }
         EventLogManager.logMenu("✅ Menu yapısı mevcut", "Toplam ${structure.mainMenus.size} ana menu var")
         
-        EventLogManager.logMenu("Adım 2: mainIndex=$mainIndex ile main menu aranıyor", "find() çağrılıyor")
+        // NOT: Normalizasyon DeviceEventService'te yapılıyor, burada direkt kullanıyoruz
+        EventLogManager.logMenu("Adım 2: mainIndex=$mainIndex ile main menu aranıyor (normalizasyon zaten yapıldı)", "find() çağrılıyor")
         val mainMenu = structure.mainMenus.find { it.id == mainIndex }
         if (mainMenu == null) {
             EventLogManager.logMenu("❌ HATA: Main menu bulunamadı", "mainIndex=$mainIndex, mevcut ID'ler: ${structure.mainMenus.map { it.id }}", true)
@@ -110,7 +112,7 @@ class MenuManager(private val context: Context) {
         EventLogManager.logMenu("✅ Main menu bulundu", "id=${mainMenu.id}, ${mainMenu.subMenus.size} alt menu var")
         EventLogManager.logMenu("Adım 3: Mevcut sub menu ID'leri", "${mainMenu.subMenus.map { it.id }}")
         
-        EventLogManager.logMenu("Adım 4: subIndex=$subIndex ile sub menu aranıyor", "find() çağrılıyor")
+        EventLogManager.logMenu("Adım 4: subIndex=$subIndex ile sub menu aranıyor (normalizasyon zaten yapıldı)", "find() çağrılıyor")
         val subMenu = mainMenu.subMenus.find { it.id == subIndex }
         if (subMenu == null) {
             EventLogManager.logMenu("❌ HATA: Sub menu bulunamadı", "mainIndex=$mainIndex, subIndex=$subIndex, mevcut ID'ler: ${mainMenu.subMenus.map { it.id }}", true)
@@ -124,10 +126,10 @@ class MenuManager(private val context: Context) {
         EventLogManager.logMenu("✅ Aktif dil belirlendi", "language=$language")
         
         val name = if (subSubIndex != null && subMenu.subMenus != null) {
-            // Nested sub-menu
+            // Nested sub-menu - normalizasyon zaten yapıldı
             EventLogManager.logMenu("Adım 7: Nested sub-menu kontrolü", "subSubIndex=$subSubIndex, ${subMenu.subMenus.size} nested menu var")
             EventLogManager.logMenu("Adım 8: Nested sub menu ID'leri", "${subMenu.subMenus.map { it.id }}")
-            EventLogManager.logMenu("Adım 9: subSubIndex=$subSubIndex ile nested menu aranıyor", "find() çağrılıyor")
+            EventLogManager.logMenu("Adım 9: subSubIndex=$subSubIndex ile nested menu aranıyor (normalizasyon zaten yapıldı)", "find() çağrılıyor")
             val nestedSubMenu = subMenu.subMenus.find { it.id == subSubIndex }
             if (nestedSubMenu == null) {
                 EventLogManager.logMenu("❌ HATA: Nested sub-menu bulunamadı", "subSubIndex=$subSubIndex, mevcut ID'ler: ${subMenu.subMenus.map { it.id }}", true)
@@ -155,6 +157,8 @@ class MenuManager(private val context: Context) {
     
     fun getSubMenuClickResult(mainIndex: Int, subIndex: Int, subSubIndex: Int? = null): String? {
         val structure = menuStructure ?: return null
+        
+        // NOT: Normalizasyon ConfirmHandler'da yapılıyor, burada direkt kullanıyoruz
         val mainMenu = structure.mainMenus.find { it.id == mainIndex } ?: return null
         val subMenu = mainMenu.subMenus.find { it.id == subIndex } ?: return null
         
@@ -170,6 +174,8 @@ class MenuManager(private val context: Context) {
     
     fun hasNestedSubMenus(mainIndex: Int, subIndex: Int): Boolean {
         val structure = menuStructure ?: return false
+        
+        // NOT: Normalizasyon DeviceEventService'te yapılıyor, burada direkt kullanıyoruz
         val mainMenu = structure.mainMenus.find { it.id == mainIndex } ?: return false
         val subMenu = mainMenu.subMenus.find { it.id == subIndex } ?: return false
         return subMenu.subMenus != null && subMenu.subMenus!!.isNotEmpty()
@@ -184,6 +190,69 @@ class MenuManager(private val context: Context) {
     
     fun isMenuStructureLoaded(): Boolean {
         return menuStructure != null
+    }
+    
+    // ============================================================================
+    // INDEX NORMALIZASYON FONKSİYONLARI
+    // ============================================================================
+    
+    /**
+     * Modüler aritmetik ile index normalizasyonu
+     * Pozitif ve negatif index'leri geçerli aralığa (0..count-1) dönüştürür
+     * 
+     * Örnekler (16 menu varsa):
+     * - 16 → 0
+     * - 50 → 2
+     * - 255 → 15
+     * - -1 → 15
+     * - -2 → 14
+     */
+    private fun normalizeIndex(index: Int, count: Int): Int {
+        if (count == 0) return 0
+        return ((index % count) + count) % count
+    }
+    
+    /**
+     * Ana menu index'ini normalize et
+     */
+    fun normalizeMainIndex(index: Int): Int {
+        val structure = menuStructure ?: return index
+        val mainMenuCount = structure.mainMenus.size
+        val normalized = normalizeIndex(index, mainMenuCount)
+        android.util.Log.d("MenuManager", "📊 MainIndex normalizasyonu: $index → $normalized (toplam $mainMenuCount menu)")
+        EventLogManager.logMenu("MainIndex normalizasyonu", "$index → $normalized (toplam $mainMenuCount menu)")
+        return normalized
+    }
+    
+    /**
+     * Alt menu index'ini normalize et
+     */
+    fun normalizeSubIndex(mainIndex: Int, subIndex: Int): Int {
+        val structure = menuStructure ?: return subIndex
+        val normalizedMainIndex = normalizeMainIndex(mainIndex)
+        val mainMenu = structure.mainMenus.find { it.id == normalizedMainIndex } ?: return subIndex
+        val subMenuCount = mainMenu.subMenus.size
+        val normalized = normalizeIndex(subIndex, subMenuCount)
+        android.util.Log.d("MenuManager", "📊 SubIndex normalizasyonu: mainIndex=$mainIndex→$normalizedMainIndex, subIndex=$subIndex → $normalized (toplam $subMenuCount alt menu)")
+        EventLogManager.logMenu("SubIndex normalizasyonu", "mainIndex=$mainIndex→$normalizedMainIndex, subIndex=$subIndex → $normalized (toplam $subMenuCount alt menu)")
+        return normalized
+    }
+    
+    /**
+     * Nested alt menu index'ini normalize et
+     */
+    fun normalizeSubSubIndex(mainIndex: Int, subIndex: Int, subSubIndex: Int): Int {
+        val structure = menuStructure ?: return subSubIndex
+        val normalizedMainIndex = normalizeMainIndex(mainIndex)
+        val mainMenu = structure.mainMenus.find { it.id == normalizedMainIndex } ?: return subSubIndex
+        val normalizedSubIndex = normalizeSubIndex(normalizedMainIndex, subIndex)
+        val subMenu = mainMenu.subMenus.find { it.id == normalizedSubIndex } ?: return subSubIndex
+        val nestedSubMenus = subMenu.subMenus ?: return subSubIndex
+        val nestedSubMenuCount = nestedSubMenus.size
+        val normalized = normalizeIndex(subSubIndex, nestedSubMenuCount)
+        android.util.Log.d("MenuManager", "📊 SubSubIndex normalizasyonu: mainIndex=$mainIndex→$normalizedMainIndex, subIndex=$subIndex→$normalizedSubIndex, subSubIndex=$subSubIndex → $normalized (toplam $nestedSubMenuCount nested menu)")
+        EventLogManager.logMenu("SubSubIndex normalizasyonu", "mainIndex=$mainIndex→$normalizedMainIndex, subIndex=$subIndex→$normalizedSubIndex, subSubIndex=$subSubIndex → $normalized (toplam $nestedSubMenuCount nested menu)")
+        return normalized
     }
 }
 

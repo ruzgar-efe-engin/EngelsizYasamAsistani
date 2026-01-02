@@ -68,6 +68,7 @@ nbdist/
 build/
 .gradle/
 local.properties
+apps/eya/local.properties
 *.apk
 *.ap_
 *.aab

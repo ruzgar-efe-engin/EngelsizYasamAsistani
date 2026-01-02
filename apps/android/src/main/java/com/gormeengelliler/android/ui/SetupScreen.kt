@@ -306,12 +306,31 @@ fun SetupScreen(
                     android.util.Log.d("SetupScreen", "      Log satırı: $logLine")
                     android.util.Log.d("SetupScreen", "📝 Event log paneline YAZILIYOR...")
                     
-                    // Scroll event'lerinde bip sesi çal
+                    // KRİTİK: DeviceEventService.handleEvent() çağrılmalı!
+                    // Bu callback sadece log eklemek için, asıl işleme DeviceEventService'te yapılmalı
+                    android.util.Log.d("SetupScreen", "   🔍 DeviceEventService.handleEvent() çağrılıyor...")
+                    try {
+                        val deviceEventService = com.gormeengelliler.android.service.DeviceEventService.getInstance()
+                        if (deviceEventService != null) {
+                            android.util.Log.d("SetupScreen", "   ✅ DeviceEventService instance bulundu, handleEvent() çağrılıyor")
+                            deviceEventService.handleEvent(jsonString)
+                            android.util.Log.d("SetupScreen", "   ✅ DeviceEventService.handleEvent() çağrıldı")
+                        } else {
+                            android.util.Log.e("SetupScreen", "   ❌ DeviceEventService instance NULL! Service başlatılmamış olabilir.")
+                            android.util.Log.e("SetupScreen", "   💡 MainActivity'de DeviceEventService başlatıldığından emin olun")
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("SetupScreen", "   ❌ DeviceEventService.handleEvent() çağrılırken hata: ${e.message}")
+                        e.printStackTrace()
+                    }
+                    
+                    // Scroll event'lerinde bip sesi çal (SetupScreen'de - sadece UI feedback için)
+                    // NOT: Asıl bip sesi DeviceEventService'te çalacak, bu sadece yedek
                     if (event.type == com.gormeengelliler.android.model.EventType.MAIN_ROTATE || 
                         event.type == com.gormeengelliler.android.model.EventType.SUB_ROTATE) {
                         try {
                             toneGenerator?.startTone(ToneGenerator.TONE_PROP_BEEP, 50) // 50ms kısa bip
-                            android.util.Log.d("SetupScreen", "🔊 Scroll bip sesi çalındı")
+                            android.util.Log.d("SetupScreen", "🔊 Scroll bip sesi çalındı (SetupScreen)")
                         } catch (e: Exception) {
                             android.util.Log.e("SetupScreen", "❌ Bip sesi çalınamadı: ${e.message}")
                         }

@@ -30,148 +30,156 @@ class ConfirmHandler(
     // Generic confirm method - KRİTİK
     fun confirm(mainIndex: Int, subIndex: Int, subSubIndex: Int? = null) {
         scope.launch {
+            // Index normalizasyonu (güvenlik için - doğrudan çağrıldığında da çalışsın)
+            val normalizedMainIndex = menuManager.normalizeMainIndex(mainIndex)
+            val normalizedSubIndex = menuManager.normalizeSubIndex(normalizedMainIndex, subIndex)
+            val normalizedSubSubIndex = subSubIndex?.let { 
+                menuManager.normalizeSubSubIndex(normalizedMainIndex, normalizedSubIndex, it) 
+            }
+            android.util.Log.d("ConfirmHandler", "📊 Index normalizasyonu: mainIndex=$mainIndex → $normalizedMainIndex, subIndex=$subIndex → $normalizedSubIndex, subSubIndex=$subSubIndex → $normalizedSubSubIndex")
+            
             // Mevcut TTS'i anında kes
             ttsManager.stop()
             
-            // Önce clickResult'ı kontrol et - varsa direkt onu seslendir
-            val clickResult = menuManager.getSubMenuClickResult(mainIndex, subIndex, subSubIndex)
+            // Önce clickResult'ı kontrol et - varsa direkt onu seslendir (normalize edilmiş index ile)
+            val clickResult = menuManager.getSubMenuClickResult(normalizedMainIndex, normalizedSubIndex, normalizedSubSubIndex)
             if (clickResult != null) {
                 ttsManager.speak(clickResult)
                 // clickResult varsa işlem yapma, sadece mesajı seslendir
                 return@launch
             }
             
-            // İşlem başlarken "yapılıyor" mesajı TTS
-            val processingMessage = getProcessingMessage(mainIndex, subIndex)
+            // İşlem başlarken "yapılıyor" mesajı TTS (normalize edilmiş index ile)
+            val processingMessage = getProcessingMessage(normalizedMainIndex, normalizedSubIndex)
             ttsManager.speak(processingMessage)
             
-            // İşlem tipine göre routing
+            // İşlem tipine göre routing (normalize edilmiş index ile)
             when {
                 // Zaman - Saat Kaç?
-                mainIndex == 0 && subIndex == 0 -> {
+                normalizedMainIndex == 0 && normalizedSubIndex == 0 -> {
                     handleTimeRequest()
                 }
                 // Zaman - Tarih Bilgisi
-                mainIndex == 0 && subIndex == 1 -> {
+                normalizedMainIndex == 0 && normalizedSubIndex == 1 -> {
                     handleDateRequest()
                 }
                 // Zaman - Alarm Kur (nested sub-menu ile)
-                mainIndex == 0 && subIndex == 2 -> {
-                    if (subSubIndex != null) {
-                        handleAlarmSet(subSubIndex)
+                normalizedMainIndex == 0 && normalizedSubIndex == 2 -> {
+                    if (normalizedSubSubIndex != null) {
+                        handleAlarmSet(normalizedSubSubIndex)
                     } else {
                         // İlk click - nested sub-menu'ye geçiş yapıldı, işlem yok
                     }
                 }
                 // Zaman - Zamanlayıcı (nested sub-menu ile)
-                mainIndex == 0 && subIndex == 3 -> {
-                    if (subSubIndex != null) {
-                        handleTimerSet(subSubIndex)
+                normalizedMainIndex == 0 && normalizedSubIndex == 3 -> {
+                    if (normalizedSubSubIndex != null) {
+                        handleTimerSet(normalizedSubSubIndex)
                     } else {
                         // İlk click - nested sub-menu'ye geçiş yapıldı, işlem yok
                     }
                 }
                 // Zaman - Tüm alarmları iptal et
-                mainIndex == 0 && subIndex == 4 -> {
+                normalizedMainIndex == 0 && normalizedSubIndex == 4 -> {
                     handleCancelAllAlarms()
                 }
                 // Zaman - Hatırlatıcı (nested sub-menu ile)
-                mainIndex == 0 && subIndex == 5 -> {
-                    if (subSubIndex != null) {
-                        handleReminderSet(subSubIndex)
+                normalizedMainIndex == 0 && normalizedSubIndex == 5 -> {
+                    if (normalizedSubSubIndex != null) {
+                        handleReminderSet(normalizedSubSubIndex)
                     } else {
                         // İlk click - nested sub-menu'ye geçiş yapıldı, işlem yok
                     }
                 }
                 // Hava Durumu - Bugün
-                mainIndex == 1 && subIndex == 0 -> {
+                normalizedMainIndex == 1 && normalizedSubIndex == 0 -> {
                     weatherHandler?.handleTodayWeather() ?: handleTodayWeather()
                 }
                 // Hava Durumu - Yarın
-                mainIndex == 1 && subIndex == 1 -> {
+                normalizedMainIndex == 1 && normalizedSubIndex == 1 -> {
                     weatherHandler?.handleTomorrowWeather() ?: handleTomorrowWeather()
                 }
                 // Hava Durumu - Önümüzdeki Hafta
-                mainIndex == 1 && subIndex == 2 -> {
+                normalizedMainIndex == 1 && normalizedSubIndex == 2 -> {
                     weatherHandler?.handleNextWeekWeather() ?: handleNextWeekWeather()
                 }
                 // Konum & Yön - Mevcut Konum
-                mainIndex == 2 && subIndex == 0 -> {
+                normalizedMainIndex == 2 && normalizedSubIndex == 0 -> {
                     locationHandler?.handleCurrentLocation()
                 }
                 // Konum & Yön - Yön Bulma
-                mainIndex == 2 && subIndex == 1 -> {
+                normalizedMainIndex == 2 && normalizedSubIndex == 1 -> {
                     locationHandler?.handleDirection()
                 }
                 // Konum & Yön - Yakın Noktalar
-                mainIndex == 2 && subIndex == 2 -> {
+                normalizedMainIndex == 2 && normalizedSubIndex == 2 -> {
                     locationHandler?.handleNearbyPlaces()
                 }
                 // Acil & Güvenlik - Acil Arama
-                mainIndex == 3 && subIndex == 0 -> {
+                normalizedMainIndex == 3 && normalizedSubIndex == 0 -> {
                     emergencyHandler?.handleEmergencyCall()
                 }
                 // Acil & Güvenlik - Konum Paylaş
-                mainIndex == 3 && subIndex == 1 -> {
+                normalizedMainIndex == 3 && normalizedSubIndex == 1 -> {
                     emergencyHandler?.handleShareLocation()
                 }
                 // Acil & Güvenlik - Alarm (nested)
-                mainIndex == 3 && subIndex == 2 -> {
-                    if (subSubIndex == 0) {
+                normalizedMainIndex == 3 && normalizedSubIndex == 2 -> {
+                    if (normalizedSubSubIndex == 0) {
                         emergencyHandler?.handleAlarmSound()
-                    } else if (subSubIndex == 1) {
+                    } else if (normalizedSubSubIndex == 1) {
                         emergencyHandler?.handleAlarmVibration()
                     }
                 }
                 // İletişim - Kayıtlı Kişiler
-                mainIndex == 4 && subIndex == 0 -> {
-                    if (subSubIndex != null) {
-                        contactHandler?.handleCallContact(subSubIndex)
+                normalizedMainIndex == 4 && normalizedSubIndex == 0 -> {
+                    if (normalizedSubSubIndex != null) {
+                        contactHandler?.handleCallContact(normalizedSubSubIndex)
                     } else {
                         contactHandler?.handleSavedContacts()
                     }
                 }
                 // İletişim - Son Arananlar
-                mainIndex == 4 && subIndex == 1 -> {
+                normalizedMainIndex == 4 && normalizedSubIndex == 1 -> {
                     contactHandler?.handleRecentCalls()
                 }
                 // Notlar & Hatırlatıcı - Yeni Not
-                mainIndex == 5 && subIndex == 0 -> {
+                normalizedMainIndex == 5 && normalizedSubIndex == 0 -> {
                     notesHandler?.handleNewVoiceNote()
                 }
                 // Notlar & Hatırlatıcı - Notlarım
-                mainIndex == 5 && subIndex == 1 -> {
-                    if (subSubIndex != null) {
-                        notesHandler?.handlePlayNote(subSubIndex)
+                normalizedMainIndex == 5 && normalizedSubIndex == 1 -> {
+                    if (normalizedSubSubIndex != null) {
+                        notesHandler?.handlePlayNote(normalizedSubSubIndex)
                     } else {
                         notesHandler?.handleMyNotes()
                     }
                 }
                 // Cihaz & Sistem - Ses Ayarları
-                mainIndex == 6 && subIndex == 0 -> {
-                    if (subSubIndex == 0) {
+                normalizedMainIndex == 6 && normalizedSubIndex == 0 -> {
+                    if (normalizedSubSubIndex == 0) {
                         deviceHandler?.handleSoundSettings("kapat")
-                    } else if (subSubIndex == 1) {
+                    } else if (normalizedSubSubIndex == 1) {
                         deviceHandler?.handleSoundSettings("kıs")
                     } else {
                         deviceHandler?.handleSoundSettings("aç")
                     }
                 }
                 // Cihaz & Sistem - Cihaz Pil Seviyesi
-                mainIndex == 6 && subIndex == 1 -> {
+                normalizedMainIndex == 6 && normalizedSubIndex == 1 -> {
                     deviceHandler?.handleDeviceBatteryLevel()
                 }
                 // Cihaz & Sistem - Telefon Pil Seviyesi
-                mainIndex == 6 && subIndex == 2 -> {
+                normalizedMainIndex == 6 && normalizedSubIndex == 2 -> {
                     deviceHandler?.handlePhoneBatteryLevel()
                 }
                 // Serbest Soru (AI) - Gemini ile konuş
-                mainIndex == 7 && subIndex == 0 -> {
+                normalizedMainIndex == 7 && normalizedSubIndex == 0 -> {
                     aiHandler?.handleGeminiChat()
                 }
                 // Diğer işlemler için genel handler
                 else -> {
-                    handleGenericAction(mainIndex, subIndex, subSubIndex)
+                    handleGenericAction(normalizedMainIndex, normalizedSubIndex, normalizedSubSubIndex)
                 }
             }
         }

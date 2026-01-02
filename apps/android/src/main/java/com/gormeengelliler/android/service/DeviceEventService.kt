@@ -24,6 +24,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 class DeviceEventService : Service() {
+    // Singleton instance - SetupScreen'den erişilebilmesi için
+    companion object {
+        @Volatile
+        private var instance: DeviceEventService? = null
+        
+        fun getInstance(): DeviceEventService? = instance
+    }
+    
     private val binder = LocalBinder()
     private lateinit var transportProvider: EventTransportProvider
     private lateinit var menuManager: MenuManager
@@ -53,6 +61,10 @@ class DeviceEventService : Service() {
         android.util.Log.d("DeviceEventService", "\n🚀 ========================================")
         android.util.Log.d("DeviceEventService", "🚀 onCreate() ÇAĞRILDI")
         android.util.Log.d("DeviceEventService", "========================================")
+        
+        // Singleton instance'ı set et
+        instance = this
+        android.util.Log.d("DeviceEventService", "✅ Singleton instance set edildi")
         
         createNotificationChannel()
         
@@ -139,6 +151,10 @@ class DeviceEventService : Service() {
         android.util.Log.d("DeviceEventService", "🛑 onDestroy() ÇAĞRILDI")
         android.util.Log.d("DeviceEventService", "========================================")
         
+        // Singleton instance'ı temizle
+        instance = null
+        android.util.Log.d("DeviceEventService", "✅ Singleton instance temizlendi")
+        
         // ToneGenerator'ı temizle
         toneGenerator?.release()
         toneGenerator = null
@@ -200,7 +216,8 @@ class DeviceEventService : Service() {
         transportProvider.getCurrentTransport()?.connect(deviceId)
     }
     
-    private fun handleEvent(jsonString: String) {
+    // Public yapıldı - SetupScreen'den çağrılabilmesi için
+    fun handleEvent(jsonString: String) {
         val event = DeviceEvent.fromJson(jsonString) ?: return
         
         when (event.type) {
@@ -208,56 +225,93 @@ class DeviceEventService : Service() {
                 android.util.Log.d("DeviceEventService", "🔄 MAIN_ROTATE: mainIndex=${event.mainIndex}")
                 com.gormeengelliler.android.manager.EventLogManager.logMenu("MAIN_ROTATE event alındı", "mainIndex=${event.mainIndex}")
                 
+                // Index normalizasyonu
+                val normalizedMainIndex = menuManager.normalizeMainIndex(event.mainIndex)
+                com.gormeengelliler.android.manager.EventLogManager.logMenu("MainIndex normalizasyonu", "${event.mainIndex} → $normalizedMainIndex")
+                
                 // KRİTİK: TTS Interrupt - Yeni event geldiğinde mevcut sesi anında kes
                 ttsManager.stop()
                 
                 // Önceki Handler delay'i iptal et
                 currentTTSHandler?.removeCallbacksAndMessages(null)
                 
-                // Ana menu değiştiğinde alt menu'leri sıfırla
-                if (navigationState.currentMainIndex != event.mainIndex) {
-                    com.gormeengelliler.android.manager.EventLogManager.logMenu("Ana menu değişti", "${navigationState.currentMainIndex} -> ${event.mainIndex}, alt menu'ler sıfırlanıyor")
-                    navigationState.setMainMenu(event.mainIndex)
+                // Ana menu değiştiğinde alt menu'leri sıfırla (normalize edilmiş index ile)
+                if (navigationState.currentMainIndex != normalizedMainIndex) {
+                    com.gormeengelliler.android.manager.EventLogManager.logMenu("Ana menu değişti", "${navigationState.currentMainIndex} -> $normalizedMainIndex, alt menu'ler sıfırlanıyor")
+                    navigationState.setMainMenu(normalizedMainIndex)
                 } else {
-                    com.gormeengelliler.android.manager.EventLogManager.logMenu("Ana menu aynı", "mainIndex=${event.mainIndex}")
+                    com.gormeengelliler.android.manager.EventLogManager.logMenu("Ana menu aynı", "normalizedMainIndex=$normalizedMainIndex")
                 }
                 
                 // Scroll geri bildirimi - bip sesi
                 playScrollBeep()
                 
-                // Bip sesinden 100ms sonra aktif dilde menu adı seslendir (bip sesi 50ms, biraz daha bekleyelim)
-                com.gormeengelliler.android.manager.EventLogManager.logMenu("Menu adı alınıyor", "mainIndex=${event.mainIndex}")
-                val mainMenuName = menuManager.getMainMenuName(event.mainIndex)
-                mainMenuName?.let {
+                // Bip sesinden 100ms sonra aktif dilde menu adı seslendir (normalize edilmiş index ile)
+                com.gormeengelliler.android.manager.EventLogManager.logMenu("Menu adı alınıyor", "normalizedMainIndex=$normalizedMainIndex")
+                android.util.Log.d("DeviceEventService", "🔍 DEBUG: Menu adı alınıyor, normalizedMainIndex=$normalizedMainIndex")
+                
+                val mainMenuName = menuManager.getMainMenuName(normalizedMainIndex)
+                android.util.Log.d("DeviceEventService", "🔍 DEBUG: getMainMenuName() çağrıldı, sonuç: mainMenuName=${mainMenuName ?: "NULL"}")
+                com.gormeengelliler.android.manager.EventLogManager.logMenu("getMainMenuName() sonucu", "mainMenuName=${mainMenuName ?: "NULL"}")
+                
+                if (mainMenuName != null) {
+                    android.util.Log.d("DeviceEventService", "🔍 DEBUG: mainMenuName != null, TTS başlatılacak")
                     val selectedLanguage = menuManager.getSelectedLanguage()
-                    android.util.Log.d("DeviceEventService", "📢 Menu adı seslendirilecek: '$it' (dil: $selectedLanguage)")
-                    com.gormeengelliler.android.manager.EventLogManager.logMenu("Menu adı alındı, TTS başlatılıyor", "text='$it', language=$selectedLanguage")
+                    android.util.Log.d("DeviceEventService", "📢 Menu adı seslendirilecek: '$mainMenuName' (dil: $selectedLanguage)")
+                    com.gormeengelliler.android.manager.EventLogManager.logMenu("✅ Menu adı alındı, TTS başlatılıyor", "text='$mainMenuName', language=$selectedLanguage")
                     
+                    android.util.Log.d("DeviceEventService", "🔍 DEBUG: Handler oluşturuluyor...")
                     currentTTSHandler = android.os.Handler(android.os.Looper.getMainLooper())
-                    com.gormeengelliler.android.manager.EventLogManager.logMenu("Handler oluşturuldu", "100ms delay başlatıldı, text='$it'")
+                    com.gormeengelliler.android.manager.EventLogManager.logMenu("Handler oluşturuldu", "150ms delay başlatıldı, text='$mainMenuName'")
+                    
+                    android.util.Log.d("DeviceEventService", "🔍 DEBUG: postDelayed çağrılıyor, 150ms delay...")
                     currentTTSHandler?.postDelayed({
+                        android.util.Log.d("DeviceEventService", "🔍 DEBUG: Handler delay tamamlandı! Lambda içindeyiz!")
                         android.util.Log.d("DeviceEventService", "⏰ Handler delay tamamlandı, TTS başlatılıyor...")
-                        com.gormeengelliler.android.manager.EventLogManager.logMenu("Handler delay tamamlandı", "TTS başlatılıyor: '$it', speakAsync() çağrılıyor")
-                        ttsManager.speakAsync(it, selectedLanguage)
-                        com.gormeengelliler.android.manager.EventLogManager.logMenu("speakAsync() çağrıldı", "DeviceEventService'ten döndü")
-                    }, 100) // 50ms'den 100ms'ye çıkarıldı
-                } ?: run {
-                    com.gormeengelliler.android.manager.EventLogManager.logMenu("Menu adı alınamadı", "mainIndex=${event.mainIndex}", true)
+                        com.gormeengelliler.android.manager.EventLogManager.logMenu("Handler delay tamamlandı", "TTS başlatılıyor: '$mainMenuName', speakAsync() çağrılıyor")
+                        
+                        android.util.Log.d("DeviceEventService", "🔍 DEBUG: speakAsync() çağrılıyor, mainMenuName='$mainMenuName', selectedLanguage='$selectedLanguage'")
+                        ttsManager.speakAsync(mainMenuName, selectedLanguage)
+                        android.util.Log.d("DeviceEventService", "🔍 DEBUG: speakAsync() çağrıldı, döndü")
+                        com.gormeengelliler.android.manager.EventLogManager.logMenu("✅ speakAsync() çağrıldı", "DeviceEventService'ten döndü, text='$mainMenuName'")
+                    }, 150) // 100ms'den 150ms'ye çıkarıldı (bip sesi 50ms, daha güvenli timing)
+                    android.util.Log.d("DeviceEventService", "🔍 DEBUG: postDelayed çağrıldı, handler'a eklendi")
+                } else {
+                    android.util.Log.e("DeviceEventService", "❌ Menu adı alınamadı! normalizedMainIndex=$normalizedMainIndex")
+                    com.gormeengelliler.android.manager.EventLogManager.logMenu("❌ Menu adı alınamadı", "normalizedMainIndex=$normalizedMainIndex (orijinal: ${event.mainIndex})", true)
+                    // Menu bulunamadığında bile bir mesaj seslendir
+                    val selectedLanguage = menuManager.getSelectedLanguage()
+                    val errorMessage = when (selectedLanguage) {
+                        "tr" -> "Menu bulunamadı"
+                        "en" -> "Menu not found"
+                        "de" -> "Menü nicht gefunden"
+                        else -> "Menu bulunamadı"
+                    }
+                    currentTTSHandler = android.os.Handler(android.os.Looper.getMainLooper())
+                    currentTTSHandler?.postDelayed({
+                        ttsManager.speakAsync(errorMessage, selectedLanguage)
+                        com.gormeengelliler.android.manager.EventLogManager.logMenu("Hata mesajı TTS ile seslendiriliyor", "text='$errorMessage'")
+                    }, 150) // 100ms'den 150ms'ye çıkarıldı
                 }
             }
             EventType.SUB_ROTATE -> {
                 android.util.Log.d("DeviceEventService", "🔄 SUB_ROTATE: mainIndex=${event.mainIndex}, subIndex=${event.subIndex}")
                 com.gormeengelliler.android.manager.EventLogManager.logMenu("SUB_ROTATE event alındı", "mainIndex=${event.mainIndex}, subIndex=${event.subIndex}")
                 
+                // Index normalizasyonu
+                val normalizedMainIndex = menuManager.normalizeMainIndex(event.mainIndex)
+                val normalizedSubIndex = menuManager.normalizeSubIndex(normalizedMainIndex, event.subIndex)
+                com.gormeengelliler.android.manager.EventLogManager.logMenu("Index normalizasyonu", "mainIndex=${event.mainIndex} → $normalizedMainIndex, subIndex=${event.subIndex} → $normalizedSubIndex")
+                
                 // KRİTİK: TTS Interrupt - Yeni event geldiğinde mevcut sesi anında kes
                 ttsManager.stop()
                 
                 // Önceki Handler delay'i iptal et
                 currentTTSHandler?.removeCallbacksAndMessages(null)
                 
-                // Navigation state'i güncelle
-                navigationState.currentMainIndex = event.mainIndex
-                com.gormeengelliler.android.manager.EventLogManager.logMenu("Navigation state güncellendi", "currentMainIndex=${navigationState.currentMainIndex}, isAtNestedSubMenu=${navigationState.isAtNestedSubMenu()}")
+                // Navigation state'i güncelle (normalize edilmiş index ile)
+                navigationState.currentMainIndex = normalizedMainIndex
+                com.gormeengelliler.android.manager.EventLogManager.logMenu("Navigation state güncellendi", "currentMainIndex=$normalizedMainIndex, isAtNestedSubMenu=${navigationState.isAtNestedSubMenu()}")
                 
                 // Scroll geri bildirimi - bip sesi
                 playScrollBeep()
@@ -266,76 +320,97 @@ class DeviceEventService : Service() {
                 
                 // Nested sub-menu'de miyiz kontrol et
                 if (navigationState.isAtNestedSubMenu()) {
-                    // Nested sub-menu scroll
-                    com.gormeengelliler.android.manager.EventLogManager.logMenu("Nested sub-menu scroll", "currentSubIndex=${navigationState.currentSubIndex}, subSubIndex=${event.subIndex}")
-                    navigationState.currentSubSubIndex = event.subIndex
+                    // Nested sub-menu scroll - subIndex aslında subSubIndex olarak kullanılıyor
+                    val currentSubIndex = navigationState.currentSubIndex ?: 0
+                    val normalizedSubSubIndex = menuManager.normalizeSubSubIndex(normalizedMainIndex, currentSubIndex, event.subIndex)
+                    com.gormeengelliler.android.manager.EventLogManager.logMenu("Nested sub-menu scroll", "currentSubIndex=$currentSubIndex, subSubIndex=${event.subIndex} → $normalizedSubSubIndex")
+                    navigationState.currentSubSubIndex = normalizedSubSubIndex
                     val nestedSubMenuName = menuManager.getSubMenuName(
-                        event.mainIndex,
-                        navigationState.currentSubIndex ?: 0,
-                        event.subIndex
+                        normalizedMainIndex,
+                        currentSubIndex,
+                        normalizedSubSubIndex
                     )
                     nestedSubMenuName?.let {
                         android.util.Log.d("DeviceEventService", "📢 Nested sub-menu adı seslendirilecek: '$it' (dil: $selectedLanguage)")
                         com.gormeengelliler.android.manager.EventLogManager.logMenu("Nested sub-menu adı alındı, TTS başlatılıyor", "text='$it', language=$selectedLanguage")
                         currentTTSHandler = android.os.Handler(android.os.Looper.getMainLooper())
-                        com.gormeengelliler.android.manager.EventLogManager.logMenu("Handler oluşturuldu (nested)", "100ms delay başlatıldı, text='$it'")
+                        com.gormeengelliler.android.manager.EventLogManager.logMenu("Handler oluşturuldu (nested)", "150ms delay başlatıldı, text='$it'")
                         currentTTSHandler?.postDelayed({
                             android.util.Log.d("DeviceEventService", "⏰ Handler delay tamamlandı, TTS başlatılıyor...")
                             com.gormeengelliler.android.manager.EventLogManager.logMenu("Handler delay tamamlandı (nested)", "TTS başlatılıyor: '$it', speakAsync() çağrılıyor")
                             ttsManager.speakAsync(it, selectedLanguage)
                             com.gormeengelliler.android.manager.EventLogManager.logMenu("speakAsync() çağrıldı (nested)", "DeviceEventService'ten döndü")
-                        }, 100) // 50ms'den 100ms'ye çıkarıldı
+                        }, 150) // 100ms'den 150ms'ye çıkarıldı
                     } ?: run {
-                        com.gormeengelliler.android.manager.EventLogManager.logMenu("Nested sub-menu adı alınamadı", "mainIndex=${event.mainIndex}, subIndex=${navigationState.currentSubIndex}, subSubIndex=${event.subIndex}", true)
+                        com.gormeengelliler.android.manager.EventLogManager.logMenu("Nested sub-menu adı alınamadı", "normalizedMainIndex=$normalizedMainIndex, currentSubIndex=${navigationState.currentSubIndex}, normalizedSubSubIndex=$normalizedSubSubIndex", true)
                     }
                 } else {
                     // Normal sub-menu scroll
-                    com.gormeengelliler.android.manager.EventLogManager.logMenu("Normal sub-menu scroll", "subIndex=${event.subIndex}")
-                    navigationState.setSubMenu(event.subIndex)
+                    com.gormeengelliler.android.manager.EventLogManager.logMenu("Normal sub-menu scroll", "normalizedSubIndex=$normalizedSubIndex")
+                    navigationState.setSubMenu(normalizedSubIndex)
                     val subMenuName = menuManager.getSubMenuName(
-                        event.mainIndex,
-                        event.subIndex
+                        normalizedMainIndex,
+                        normalizedSubIndex
                     )
-                    subMenuName?.let {
-                        android.util.Log.d("DeviceEventService", "📢 Sub-menu adı seslendirilecek: '$it' (dil: $selectedLanguage)")
-                        com.gormeengelliler.android.manager.EventLogManager.logMenu("Sub-menu adı alındı, TTS başlatılıyor", "text='$it', language=$selectedLanguage")
+                    if (subMenuName != null) {
+                        android.util.Log.d("DeviceEventService", "📢 Sub-menu adı seslendirilecek: '$subMenuName' (dil: $selectedLanguage)")
+                        com.gormeengelliler.android.manager.EventLogManager.logMenu("✅ Sub-menu adı alındı, TTS başlatılıyor", "text='$subMenuName', language=$selectedLanguage")
                         currentTTSHandler = android.os.Handler(android.os.Looper.getMainLooper())
-                        com.gormeengelliler.android.manager.EventLogManager.logMenu("Handler oluşturuldu (sub)", "100ms delay başlatıldı, text='$it'")
+                        com.gormeengelliler.android.manager.EventLogManager.logMenu("Handler oluşturuldu (sub)", "150ms delay başlatıldı, text='$subMenuName'")
                         currentTTSHandler?.postDelayed({
                             android.util.Log.d("DeviceEventService", "⏰ Handler delay tamamlandı, TTS başlatılıyor...")
-                            com.gormeengelliler.android.manager.EventLogManager.logMenu("Handler delay tamamlandı (sub)", "TTS başlatılıyor: '$it', speakAsync() çağrılıyor")
-                            ttsManager.speakAsync(it, selectedLanguage)
-                            com.gormeengelliler.android.manager.EventLogManager.logMenu("speakAsync() çağrıldı (sub)", "DeviceEventService'ten döndü")
-                        }, 100) // 50ms'den 100ms'ye çıkarıldı
-                    } ?: run {
-                        com.gormeengelliler.android.manager.EventLogManager.logMenu("Sub-menu adı alınamadı", "mainIndex=${event.mainIndex}, subIndex=${event.subIndex}", true)
+                            com.gormeengelliler.android.manager.EventLogManager.logMenu("Handler delay tamamlandı (sub)", "TTS başlatılıyor: '$subMenuName', speakAsync() çağrılıyor")
+                            ttsManager.speakAsync(subMenuName, selectedLanguage)
+                            com.gormeengelliler.android.manager.EventLogManager.logMenu("✅ speakAsync() çağrıldı (sub)", "DeviceEventService'ten döndü, text='$subMenuName'")
+                        }, 150) // 100ms'den 150ms'ye çıkarıldı
+                    } else {
+                        android.util.Log.e("DeviceEventService", "❌ Sub-menu adı alınamadı! normalizedMainIndex=$normalizedMainIndex, normalizedSubIndex=$normalizedSubIndex")
+                        com.gormeengelliler.android.manager.EventLogManager.logMenu("❌ Sub-menu adı alınamadı", "normalizedMainIndex=$normalizedMainIndex, normalizedSubIndex=$normalizedSubIndex (orijinal: mainIndex=${event.mainIndex}, subIndex=${event.subIndex})", true)
+                        // Menu bulunamadığında bile bir mesaj seslendir
+                        val errorMessage = when (selectedLanguage) {
+                            "tr" -> "Menu bulunamadı"
+                            "en" -> "Menu not found"
+                            "de" -> "Menü nicht gefunden"
+                            else -> "Menu bulunamadı"
+                        }
+                        currentTTSHandler = android.os.Handler(android.os.Looper.getMainLooper())
+                        currentTTSHandler?.postDelayed({
+                            ttsManager.speakAsync(errorMessage, selectedLanguage)
+                            com.gormeengelliler.android.manager.EventLogManager.logMenu("Hata mesajı TTS ile seslendiriliyor", "text='$errorMessage'")
+                        }, 150) // 100ms'den 150ms'ye çıkarıldı
                     }
                 }
             }
             EventType.CONFIRM -> {
+                // Index normalizasyonu
+                val normalizedMainIndex = menuManager.normalizeMainIndex(event.mainIndex)
+                val normalizedSubIndex = menuManager.normalizeSubIndex(normalizedMainIndex, event.subIndex)
+                com.gormeengelliler.android.manager.EventLogManager.logMenu("CONFIRM index normalizasyonu", "mainIndex=${event.mainIndex} → $normalizedMainIndex, subIndex=${event.subIndex} → $normalizedSubIndex")
+                
                 // KRİTİK: TTS Interrupt - Yeni event geldiğinde mevcut sesi anında kes
                 ttsManager.stop()
                 
-                // Navigation state'e göre işlem yap
+                // Navigation state'e göre işlem yap (normalize edilmiş index ile)
                 if (navigationState.isAtNestedSubMenu()) {
                     // Nested sub-menu click
-                    val subSubIndex = navigationState.currentSubSubIndex ?: event.subIndex
+                    val subSubIndex = navigationState.currentSubSubIndex ?: normalizedSubIndex
+                    val normalizedSubSubIndex = menuManager.normalizeSubSubIndex(normalizedMainIndex, navigationState.currentSubIndex ?: 0, subSubIndex)
                     confirmHandler.confirm(
-                        event.mainIndex,
+                        normalizedMainIndex,
                         navigationState.currentSubIndex ?: 0,
-                        subSubIndex
+                        normalizedSubSubIndex
                     )
                 } else {
                     // Normal sub-menu click - nested sub-menu var mı kontrol et
-                    val hasNested = menuManager.hasNestedSubMenus(event.mainIndex, event.subIndex)
+                    val hasNested = menuManager.hasNestedSubMenus(normalizedMainIndex, normalizedSubIndex)
                     if (hasNested) {
                         // Nested sub-menu'ye geç
-                        navigationState.setSubMenu(event.subIndex)
+                        navigationState.setSubMenu(normalizedSubIndex)
                         navigationState.setNestedSubMenu(0)
                         // İlk nested sub-menu'yu aktif dilde seslendir
                         val firstNestedName = menuManager.getSubMenuName(
-                            event.mainIndex,
-                            event.subIndex,
+                            normalizedMainIndex,
+                            normalizedSubIndex,
                             0
                         )
                         firstNestedName?.let {
@@ -343,8 +418,8 @@ class DeviceEventService : Service() {
                         }
                     } else {
                         // Normal click - direkt işlemi yap
-                        navigationState.setSubMenu(event.subIndex)
-                        confirmHandler.confirm(event.mainIndex, event.subIndex)
+                        navigationState.setSubMenu(normalizedSubIndex)
+                        confirmHandler.confirm(normalizedMainIndex, normalizedSubIndex)
                     }
                 }
             }

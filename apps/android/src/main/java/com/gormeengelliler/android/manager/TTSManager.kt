@@ -148,24 +148,59 @@ class TTSManager(private val context: Context, private val menuManager: MenuMana
     }
     
     // KRİTİK: TTS Interrupt Mekanizması
+    // NOT: isSpeaking flag'ini false yapmıyoruz, çünkü yeni ses başlatılırken flag korunmalı
+    // stop() sadece mevcut AudioTrack'i durdurur, yeni sesin başlamasını engellemez
     fun stop() {
-        isSpeaking = false
+        val timestamp = System.currentTimeMillis()
+        android.util.Log.d("TTSManager", "🛑 stop() çağrıldı - timestamp=$timestamp, isSpeaking=$isSpeaking, currentAudioTrack=${currentAudioTrack != null}")
+        EventLogManager.logTTS("stop() çağrıldı", "timestamp=$timestamp, isSpeaking=$isSpeaking, currentAudioTrack=${currentAudioTrack != null}")
+        
         currentAudioTrack?.let { track ->
             try {
-                if (track.playState == AudioTrack.PLAYSTATE_PLAYING) {
+                val playState = track.playState
+                android.util.Log.d("TTSManager", "🛑 Mevcut AudioTrack durduruluyor - playState=$playState")
+                EventLogManager.logTTS("Mevcut AudioTrack durduruluyor", "playState=$playState")
+                
+                if (playState == AudioTrack.PLAYSTATE_PLAYING) {
                     track.stop()
+                    android.util.Log.d("TTSManager", "✅ AudioTrack durduruldu")
+                    EventLogManager.logTTS("AudioTrack durduruldu", "stop() çağrıldı")
+                } else {
+                    android.util.Log.d("TTSManager", "⚠️ AudioTrack zaten durmuş - playState=$playState")
+                    EventLogManager.logTTS("AudioTrack zaten durmuş", "playState=$playState")
                 }
                 track.release()
+                android.util.Log.d("TTSManager", "✅ AudioTrack release edildi")
+                EventLogManager.logTTS("AudioTrack release edildi")
             } catch (e: Exception) {
+                android.util.Log.e("TTSManager", "❌ stop() hatası: ${e.message}", e)
+                EventLogManager.logTTS("stop() hatası", "${e.message}", true)
                 e.printStackTrace()
             }
+        } ?: run {
+            android.util.Log.d("TTSManager", "⚠️ stop() çağrıldı ama currentAudioTrack=null")
+            EventLogManager.logTTS("stop() çağrıldı ama currentAudioTrack=null")
         }
         currentAudioTrack = null
+        
+        // KRİTİK: isSpeaking flag'ini false yapmıyoruz!
+        // Çünkü yeni ses başlatılırken bu flag korunmalı
+        // isSpeaking flag'i sadece speak() başında true yapılır ve playAudio() tamamlandığında false yapılır
+        android.util.Log.d("TTSManager", "🛑 stop() tamamlandı - isSpeaking=$isSpeaking (değiştirilmedi)")
+        EventLogManager.logTTS("stop() tamamlandı", "isSpeaking=$isSpeaking (değiştirilmedi)")
     }
     
     suspend fun speak(text: String, language: String? = null): Boolean {
-        android.util.Log.d("TTSManager", "🔊 speak çağrıldı: text='$text', language=$language")
-        EventLogManager.logTTS("speak başladı", "text='${text.take(50)}${if (text.length > 50) "..." else ""}', language=$language")
+        val timestamp = System.currentTimeMillis()
+        android.util.Log.d("TTSManager", "🔊 speak çağrıldı: text='$text', language=$language, timestamp=$timestamp")
+        EventLogManager.logTTS("speak başladı", "text='${text.take(50)}${if (text.length > 50) "..." else ""}', language=$language, timestamp=$timestamp")
+        
+        // KRİTİK: isSpeaking flag'ini en başta true yap
+        // Bu sayede stop() çağrılsa bile yeni ses başlatılabilir
+        val previousIsSpeaking = isSpeaking
+        isSpeaking = true
+        android.util.Log.d("TTSManager", "✅ isSpeaking=true yapıldı (önceki değer: $previousIsSpeaking)")
+        EventLogManager.logTTS("isSpeaking=true yapıldı", "önceki değer: $previousIsSpeaking, timestamp=$timestamp")
         
         try {
             // Mevcut sesi anında kes (ama isSpeaking'i false yapma, çünkü yeni ses başlayacak)
@@ -192,24 +227,38 @@ class TTSManager(private val context: Context, private val menuManager: MenuMana
             val selectedLanguage = language ?: menuManager.getSelectedLanguage()
             android.util.Log.d("TTSManager", "📝 Seçili dil: $selectedLanguage")
             EventLogManager.logTTS("Dil seçildi", "language=$selectedLanguage")
+            
+            // KRİTİK: API çağrısından önce isSpeaking kontrolü
+            if (!isSpeaking) {
+                android.util.Log.w("TTSManager", "⚠️ speak() iptal edildi: isSpeaking=false (stop() çağrılmış olabilir)")
+                EventLogManager.logTTS("speak() iptal edildi", "isSpeaking=false (stop() çağrılmış olabilir)", true)
+                return false
+            }
         
             // Önce Gemini TTS dene
-            EventLogManager.logTTS("Gemini API key kontrol ediliyor", "geminiApiKey.isEmpty()=${geminiApiKey.isEmpty()}")
-            if (geminiApiKey.isNotEmpty()) {
+            EventLogManager.logTTS("Gemini API key kontrol ediliyor", "geminiApiKey.isEmpty()=${geminiApiKey.isEmpty()}, isSpeaking=$isSpeaking")
+            if (geminiApiKey.isNotEmpty() && isSpeaking) {
                 android.util.Log.d("TTSManager", "🤖 Gemini TTS deneniyor...")
-                EventLogManager.logTTS("Gemini TTS deneniyor", "text='${text.take(30)}...'")
+                EventLogManager.logTTS("Gemini TTS deneniyor", "text='${text.take(30)}...', isSpeaking=$isSpeaking")
                 val geminiResult = tryGeminiTTS(text, selectedLanguage)
-                EventLogManager.logTTS("Gemini TTS sonucu", "result=$geminiResult")
-                if (geminiResult) {
+                EventLogManager.logTTS("Gemini TTS sonucu", "result=$geminiResult, isSpeaking=$isSpeaking")
+                if (geminiResult && isSpeaking) {
                     android.util.Log.d("TTSManager", "✅ Gemini TTS başarılı")
-                    EventLogManager.logTTS("Gemini TTS başarılı", "playAudio çağrıldı")
+                    EventLogManager.logTTS("Gemini TTS başarılı", "playAudio çağrıldı, isSpeaking=$isSpeaking")
                     return true
                 }
-                android.util.Log.d("TTSManager", "⚠️ Gemini TTS başarısız, Google TTS'e geçiliyor")
-                EventLogManager.logTTS("Gemini TTS başarısız", "Google TTS'e geçiliyor")
+                android.util.Log.d("TTSManager", "⚠️ Gemini TTS başarısız veya isSpeaking=false, Google TTS'e geçiliyor")
+                EventLogManager.logTTS("Gemini TTS başarısız veya isSpeaking=false", "Google TTS'e geçiliyor, isSpeaking=$isSpeaking")
             } else {
-                android.util.Log.d("TTSManager", "⚠️ Gemini API key yok, Google TTS kullanılıyor")
-                EventLogManager.logTTS("Gemini API key yok", "Google TTS kullanılıyor")
+                android.util.Log.d("TTSManager", "⚠️ Gemini API key yok veya isSpeaking=false, Google TTS kullanılıyor")
+                EventLogManager.logTTS("Gemini API key yok veya isSpeaking=false", "Google TTS kullanılıyor, isSpeaking=$isSpeaking")
+            }
+            
+            // KRİTİK: Google TTS'e geçmeden önce isSpeaking kontrolü
+            if (!isSpeaking) {
+                android.util.Log.w("TTSManager", "⚠️ speak() iptal edildi: isSpeaking=false (stop() çağrılmış olabilir)")
+                EventLogManager.logTTS("speak() iptal edildi (Google TTS öncesi)", "isSpeaking=false (stop() çağrılmış olabilir)", true)
+                return false
             }
         
             // Gemini TTS başarısız olursa Google TTS'e fallback
@@ -225,7 +274,7 @@ class TTSManager(private val context: Context, private val menuManager: MenuMana
             android.util.Log.d("TTSManager", "🔊 Google TTS kullanılıyor: ${config.googleTTS.voiceId}")
             EventLogManager.logTTS("Google TTS kullanılıyor", "voiceId=${config.googleTTS.voiceId}, languageCode=${config.googleTTS.languageCode}")
             
-            EventLogManager.logTTS("Google TTS API key kontrol ediliyor", "apiKey.isEmpty()=${apiKey.isEmpty()}")
+            EventLogManager.logTTS("Google TTS API key kontrol ediliyor", "apiKey.isEmpty()=${apiKey.isEmpty()}, isSpeaking=$isSpeaking")
             if (apiKey.isEmpty()) {
                 android.util.Log.e("TTSManager", "❌ Google TTS API key yok")
                 EventLogManager.logTTS("Google TTS API key yok", "", true)
@@ -233,8 +282,9 @@ class TTSManager(private val context: Context, private val menuManager: MenuMana
                 return false
             }
             
-            isSpeaking = true
-            EventLogManager.logTTS("isSpeaking=true yapıldı", "Google TTS API çağrısı başlatılıyor")
+            // isSpeaking zaten true yapıldı (en başta)
+            android.util.Log.d("TTSManager", "✅ isSpeaking=$isSpeaking (zaten true), Google TTS API çağrısı başlatılıyor")
+            EventLogManager.logTTS("isSpeaking kontrolü", "isSpeaking=$isSpeaking, Google TTS API çağrısı başlatılıyor")
         
             return try {
                 // Google TTS API çağrısı
@@ -275,18 +325,21 @@ class TTSManager(private val context: Context, private val menuManager: MenuMana
                     val audioContent = JSONObject(responseBody).getString("audioContent")
                     val audioBytes = android.util.Base64.decode(audioContent, android.util.Base64.DEFAULT)
                     
-                    android.util.Log.d("TTSManager", "✅ Google TTS API başarılı, ${audioBytes.size} bytes alındı")
-                    EventLogManager.logTTS("Google TTS API başarılı", "${audioBytes.size} bytes alındı, playAudio() çağrılıyor")
+                    android.util.Log.d("TTSManager", "✅ Google TTS API başarılı, ${audioBytes.size} bytes alındı, isSpeaking=$isSpeaking")
+                    EventLogManager.logTTS("Google TTS API başarılı", "${audioBytes.size} bytes alındı, isSpeaking=$isSpeaking, playAudio() çağrılıyor")
+                    
+                    // KRİTİK: playAudio() çağrılmadan önce isSpeaking kontrolü
+                    if (!isSpeaking) {
+                        android.util.Log.w("TTSManager", "⚠️ playAudio() çağrılmadı: isSpeaking=false (stop() çağrılmış olabilir)")
+                        EventLogManager.logTTS("playAudio() çağrılmadı", "isSpeaking=false (stop() çağrılmış olabilir)", true)
+                        return false
+                    }
                     
                     // AudioTrack ile çal
-                    if (isSpeaking) {
-                        playAudio(audioBytes)
-                        true
-                    } else {
-                        android.util.Log.w("TTSManager", "⚠️ isSpeaking=false, ses çalınmadı")
-                        EventLogManager.logTTS("isSpeaking=false", "ses çalınmadı", true)
-                        false
-                    }
+                    android.util.Log.d("TTSManager", "🔊 playAudio() çağrılıyor, isSpeaking=$isSpeaking")
+                    EventLogManager.logTTS("playAudio() çağrılıyor", "isSpeaking=$isSpeaking")
+                    playAudio(audioBytes)
+                    true
                 } else {
                     android.util.Log.e("TTSManager", "❌ Google TTS API hatası: ${response.code}, isSpeaking=$isSpeaking")
                     EventLogManager.logTTS("Google TTS API hatası", "code=${response.code}, isSpeaking=$isSpeaking", true)
@@ -316,9 +369,16 @@ class TTSManager(private val context: Context, private val menuManager: MenuMana
             return false
         }
         
-        android.util.Log.d("TTSManager", "🤖 tryGeminiTTS: Gemini TTS deneniyor, text='$text'")
-        isSpeaking = true
-        EventLogManager.logTTS("isSpeaking=true yapıldı (Gemini)", "Gemini TTS API çağrısı başlatılıyor")
+        android.util.Log.d("TTSManager", "🤖 tryGeminiTTS: Gemini TTS deneniyor, text='$text', isSpeaking=$isSpeaking")
+        // isSpeaking zaten speak() başında true yapıldı
+        EventLogManager.logTTS("tryGeminiTTS başladı", "isSpeaking=$isSpeaking (zaten true), Gemini TTS API çağrısı başlatılıyor")
+        
+        // KRİTİK: API çağrısından önce isSpeaking kontrolü
+        if (!isSpeaking) {
+            android.util.Log.w("TTSManager", "⚠️ tryGeminiTTS iptal edildi: isSpeaking=false")
+            EventLogManager.logTTS("tryGeminiTTS iptal edildi", "isSpeaking=false", true)
+            return false
+        }
         
         return try {
             // Gemini TTS API çağrısı (gemini-2.5-flash-tts)
@@ -380,14 +440,19 @@ class TTSManager(private val context: Context, private val menuManager: MenuMana
                                 if (audioContent.isNotEmpty()) {
                                     val audioBytes = android.util.Base64.decode(audioContent, android.util.Base64.DEFAULT)
                                     android.util.Log.d("TTSManager", "✅ Gemini TTS audio alındı, ${audioBytes.size} bytes")
-                                    EventLogManager.logTTS("Gemini TTS audio alındı", "${audioBytes.size} bytes, isSpeaking=$isSpeaking, playAudio() çağrılıyor")
-                                    if (isSpeaking) {
-                                        playAudio(audioBytes)
-                                        return true
-                                    } else {
-                                        EventLogManager.logTTS("Gemini TTS: isSpeaking=false", "playAudio çağrılmadı", true)
+                                    EventLogManager.logTTS("Gemini TTS audio alındı", "${audioBytes.size} bytes, isSpeaking=$isSpeaking")
+                                    
+                                    // KRİTİK: playAudio() çağrılmadan önce isSpeaking kontrolü
+                                    if (!isSpeaking) {
+                                        android.util.Log.w("TTSManager", "⚠️ playAudio() çağrılmadı (Gemini): isSpeaking=false")
+                                        EventLogManager.logTTS("playAudio() çağrılmadı (Gemini)", "isSpeaking=false", true)
                                         return false
                                     }
+                                    
+                                    android.util.Log.d("TTSManager", "🔊 playAudio() çağrılıyor (Gemini), isSpeaking=$isSpeaking")
+                                    EventLogManager.logTTS("playAudio() çağrılıyor (Gemini)", "isSpeaking=$isSpeaking")
+                                    playAudio(audioBytes)
+                                    return true
                                 } else {
                                     android.util.Log.w("TTSManager", "⚠️ Gemini TTS: inlineData.data boş")
                                     EventLogManager.logTTS("Gemini TTS inlineData.data boş", "", true)
@@ -443,11 +508,13 @@ class TTSManager(private val context: Context, private val menuManager: MenuMana
     }
     
     private suspend fun playAudio(audioBytes: ByteArray) {
-        if (!isSpeaking) {
-            android.util.Log.d("TTSManager", "❌ playAudio: isSpeaking=false, çıkılıyor")
-            EventLogManager.logTTS("playAudio iptal", "isSpeaking=false", true)
-            return
-        }
+        val timestamp = System.currentTimeMillis()
+        android.util.Log.d("TTSManager", "🔊 playAudio başladı: ${audioBytes.size} bytes, isSpeaking=$isSpeaking, timestamp=$timestamp")
+        EventLogManager.logTTS("playAudio başladı", "${audioBytes.size} bytes, isSpeaking=$isSpeaking, timestamp=$timestamp")
+        
+        // KRİTİK: playAudio() başındaki isSpeaking kontrolü kaldırıldı
+        // Çünkü bu kontrol speak() içinde playAudio() çağrılmadan önce yapılıyor
+        // Burada kontrol yapmak race condition'a neden olabilir
         
         try {
             android.util.Log.d("TTSManager", "🔊 playAudio: Ses çalınıyor, ${audioBytes.size} bytes")
@@ -515,26 +582,41 @@ class TTSManager(private val context: Context, private val menuManager: MenuMana
             EventLogManager.logTTS("Audio çalınıyor", "play() çağrıldı")
             
             // Ses bitene kadar bekle (coroutine delay kullan)
+            android.util.Log.d("TTSManager", "⏳ Ses çalınırken bekleniyor, isSpeaking=$isSpeaking")
+            EventLogManager.logTTS("Ses çalınırken bekleniyor", "isSpeaking=$isSpeaking, playState=${track.playState}")
             while (isSpeaking && track.playState == AudioTrack.PLAYSTATE_PLAYING) {
                 delay(50)
             }
             
-            if (isSpeaking) {
-                android.util.Log.d("TTSManager", "✅ playAudio: Ses çalma tamamlandı")
-                EventLogManager.logTTS("Ses çalma tamamlandı", "track.stop() çağrılıyor")
+            val finalIsSpeaking = isSpeaking
+            android.util.Log.d("TTSManager", "⏹️ Ses çalma döngüsü bitti, isSpeaking=$finalIsSpeaking, playState=${track.playState}")
+            EventLogManager.logTTS("Ses çalma döngüsü bitti", "isSpeaking=$finalIsSpeaking, playState=${track.playState}")
+            
+            if (finalIsSpeaking) {
+                android.util.Log.d("TTSManager", "✅ playAudio: Ses çalma tamamlandı (normal bitiş)")
+                EventLogManager.logTTS("Ses çalma tamamlandı", "track.stop() çağrılıyor (normal bitiş)")
                 track.stop()
             } else {
-                android.util.Log.d("TTSManager", "⚠️ playAudio: Ses kesildi (isSpeaking=false)")
-                EventLogManager.logTTS("Ses kesildi", "isSpeaking=false")
+                android.util.Log.d("TTSManager", "⚠️ playAudio: Ses kesildi (isSpeaking=false, stop() çağrılmış)")
+                EventLogManager.logTTS("Ses kesildi", "isSpeaking=false (stop() çağrılmış)")
+                track.stop()
             }
             
             track.release()
             currentAudioTrack = null
-            EventLogManager.logTTS("AudioTrack temizlendi", "track.release()")
+            
+            // KRİTİK: playAudio() tamamlandığında isSpeaking=false yap
+            isSpeaking = false
+            android.util.Log.d("TTSManager", "✅ playAudio tamamlandı, isSpeaking=false yapıldı")
+            EventLogManager.logTTS("playAudio tamamlandı", "isSpeaking=false yapıldı, track.release()")
         } catch (e: Exception) {
             android.util.Log.e("TTSManager", "❌ playAudio hatası: ${e.message}", e)
             EventLogManager.logTTS("playAudio hatası", "${e.message}", true)
             e.printStackTrace()
+            // Hata durumunda da isSpeaking=false yap
+            isSpeaking = false
+            android.util.Log.d("TTSManager", "❌ playAudio hatası sonrası isSpeaking=false yapıldı")
+            EventLogManager.logTTS("playAudio hatası sonrası", "isSpeaking=false yapıldı")
         }
     }
     
