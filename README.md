@@ -1,81 +1,86 @@
-# Görme Engelliler Projesi - Monorepo
+# Engelsiz Yaşam Asistanı (EYA)
 
-Görme engelli kullanıcıların toplu taşıma ve günlük şehir yaşamında menüler arasında dokunsal ve sesli geri bildirimle gezinebilmesini sağlayan, ekransız, avuç içi / saat formunda bir akıllı kontrol cihazı projesi.
+Görme engelli kullanıcılar için dokunsal ve sesli geri bildirimle çalışan, ekransız akıllı kontrol cihazı projesi.
 
 ## Proje Yapısı
 
 ```
 /
-├── device/              # ESP32 firmware (PlatformIO)
-│   ├── src/
-│   ├── platformio.ini
-│   └── wokwi.toml
-├── apps/
-│   ├── ios/            # iOS uygulaması (SwiftUI)
-│   ├── android/         # Android uygulaması (Kotlin)
-│   └── web/
-│       ├── driver-dashboard/  # Şoför dashboard (React + TypeScript)
-│       └── admin-panel/       # Admin panel (React + TypeScript)
-├── backend/            # Backend API (Node.js + TypeScript + Express)
-└── contracts/          # Event sözleşmeleri (JSON şemalar)
+├── device/              # ESP32-S3 firmware (PlatformIO)
+│   ├── src/            # Kaynak kodlar
+│   ├── platformio.ini  # PlatformIO konfigürasyonu
+│   ├── wokwi.toml      # Wokwi simülasyon konfigürasyonu
+│   └── diagram.json    # Wokwi devre şeması
+└── apps/
+    └── eya/            # Android uygulaması (Kotlin)
+        ├── src/        # Kaynak kodlar
+        └── build.gradle.kts
 ```
 
 ## Mimari
 
 ### Cihaz (Device)
-- ESP32-S3 (Seeed Studio XIAO)
+- **ESP32-S3** (Seeed Studio XIAO)
 - Encoder ve buton okuma
-- Event üretimi ve transport abstraction
-- LED geri bildirim (Faz-1)
-- BLE event gönderimi (gelecekte)
+- BLE üzerinden event gönderimi
+- LED geri bildirim
 
-### Mobil Uygulamalar
-- iOS (SwiftUI) - CoreBluetooth ile BLE event dinleme
-- Android (Kotlin) - BLE foreground service
-- Event → pozisyon → metin → TTS
-- AI tetikleme (press-to-talk)
+### Android Uygulaması (EYA)
+- **Kotlin** ile geliştirilmiş Android uygulaması
+- BLE foreground service ile cihazdan event dinleme
+- Event → menü pozisyonu → metin → TTS seslendirme
+- AI entegrasyonu (Gemini, OpenAI) - press-to-talk
+- Sistem servisleri entegrasyonu (alarm, konum, iletişim, vb.)
 
-### Backend
-- Node.js + TypeScript + Express
-- AI servisleri
-- Kullanıcı / cihaz / hat / durak yönetimi
-- Şoför bildirimleri
-- Admin API
+## BLE İletişimi
 
-### Web Uygulamaları
-- Şoför Dashboard (React + TypeScript)
-- Admin Panel (React + TypeScript)
-- Aynı backend API'yi kullanır
+Cihaz, kullanıcı etkileşimlerini BLE üzerinden event formatında Android uygulamasına gönderir.
 
-## Event Sistemi
+### Event Türleri
+- `MAIN_ROTATE` (0) - Ana menü encoder döndü
+- `SUB_ROTATE` (1) - Alt menü encoder döndü
+- `CONFIRM` (2) - Seçim onaylandı
+- `EVENT_CANCEL` (3) - İptal
+- `AI_PRESS` (4) - AI butonu basıldı
+- `AI_RELEASE` (5) - AI butonu bırakıldı
 
-Cihaz, kullanıcı etkileşimlerini event formatında gönderir. Detaylar için `contracts/README.md` dosyasına bakın.
+### Event Formatı
+```json
+{
+  "type": 0,
+  "mainIndex": 1,
+  "subIndex": 0,
+  "ts": 1234567890
+}
+```
 
 ## Geliştirme
 
-### Device
+### Device (ESP32)
 ```bash
 cd device
-pio run
+pio run          # Derle
+pio upload       # Yükle
+pio monitor      # Serial monitor
 ```
 
-### Backend
+### Android (EYA)
 ```bash
-cd backend
-npm install
-npm run dev
+cd apps/eya
+./gradlew assembleDebug    # APK derle
+./gradlew installDebug     # Telefona yükle
 ```
 
-### Web Apps
-```bash
-cd apps/web/driver-dashboard
-npm install
-npm run dev
-```
+## Gereksinimler
+
+- **ESP32-S3** (Seeed Studio XIAO)
+- **Android 8.0+** cihaz
+- **PlatformIO** (cihaz geliştirme için)
+- **Android Studio** veya **Gradle** (Android geliştirme için)
 
 ## Notlar
 
-- Bu proje monorepo yapısında geliştirilmektedir
-- Her katman bağımsız olarak geliştirilebilir
-- Event sözleşmesi `contracts/` klasöründe "tek gerçek" olarak tutulur
-
+- Cihaz sadece **pozisyon (index)** gönderir, metin bilgisi yok
+- Android uygulaması event'i alır, pozisyona göre menü metnini bulur ve TTS ile seslendirir
+- BLE iletişimi gerçek cihaz üzerinden çalışır
+- Wokwi simülasyonu mevcut ancak iletişim gerçek cihaz üzerinden yapılır

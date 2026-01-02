@@ -86,7 +86,7 @@ apps/eya/local.properties
 .cxx/
 
 # ============================================
-# Node.js / npm
+# Node.js / npm (gelecekte gerekirse)
 # ============================================
 node_modules/
 npm-debug.log*
@@ -101,11 +101,6 @@ lerna-debug.log*
 .env.*.local
 .env.production
 .env.development
-
-# Package manager lock files (opsiyonel - eğer lock file'ları commit etmek istiyorsanız bunları kaldırın)
-# package-lock.json
-# yarn.lock
-# pnpm-lock.yaml
 
 # ============================================
 # PlatformIO / Embedded
@@ -129,7 +124,7 @@ logs/
 *.log.*
 
 # ============================================
-# Test ve Coverage
+# Test ve Coverage (gelecekte gerekirse)
 # ============================================
 coverage/
 .nyc_output/
@@ -168,9 +163,8 @@ htmlcov/
 *.sqlite3
 
 # ============================================
-# Diğer
+# Python (gelecekte gerekirse)
 # ============================================
-# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -179,15 +173,4 @@ __pycache__/
 venv/
 env/
 ENV/
-
-# Rust (eğer gelecekte kullanılırsa)
-target/
-Cargo.lock
-
-# Go (eğer gelecekte kullanılırsa)
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
 
