@@ -236,6 +236,11 @@ void setup() {
 
   // Başlangıç mesajı (Serial Monitor'de görünür)
   Serial.println("[INIT] Pozisyon takibi aktif");
+  
+  // Cihaz açıldığında otomatik olarak 15 saniye pairing mode başlat
+  Serial.println("[INIT] Otomatik pairing mode başlatılıyor (15 saniye)...");
+  eventTransport.enablePairingMode();
+  Serial.println("[INIT] Pairing mode başlatıldı");
 }
 
 /* ============================================================================
@@ -257,9 +262,8 @@ static uint32_t lastAiReleaseTime = 0;      // AI butonu son bırakılma zamanı
 static uint32_t lastSubSwReleaseTime = 0;   // SubSW butonu son bırakılma zamanı
 static const uint32_t BUTTON_RELEASE_DEBOUNCE_MS = 100; // Buton bırakıldıktan sonra 100ms bekle
 
-// AI butonuna uzun basış için zaman takibi (Pairing mode için)
-static uint32_t aiPressStartTime = 0;       // AI butonu basılı tutma başlangıç zamanı
-static const uint32_t LONG_PRESS_MS = 5000; // 5 saniye basılı tutma süresi
+// AI butonu artık sadece bas-konuş için kullanılıyor
+// Pairing mode cihaz açılışında otomatik başlatılıyor
 
 // Encoder event gönderimi için rate limiting
 static uint32_t lastMainRotateTime = 0;     // Son ana menü rotate event zamanı
@@ -338,7 +342,7 @@ void loop() {
   // BUTON OKUMA (Butonları Oku ve Event Gönder)
   // ========================================================================
   
-  // AI Button (AI Butonu - Basılı Tutma Desteği ve Pairing Mode)
+  // AI Button (AI Butonu - Sadece Bas-Konuş İçin)
   uint8_t aiState = digitalRead(PIN_AI);
   
   if (aiState == LOW && !aiPressed) {
@@ -347,27 +351,15 @@ void loop() {
     uint32_t now = millis();
     if (lastAiReleaseTime == 0 || (now - lastAiReleaseTime >= BUTTON_RELEASE_DEBOUNCE_MS)) {
       aiPressed = true;
-      aiPressStartTime = now; // Basılı tutma başlangıcını kaydet
-      // Event gönder: AI butonu basıldı
+      // Event gönder: AI butonu basıldı (bas-konuş başladı)
       sendEvent(AI_PRESS, mainIndex, subIndex);
-    }
-  } else if (aiState == LOW && aiPressed) {
-    // Buton hala basılı - uzun basış kontrolü (Pairing mode için)
-    uint32_t now = millis();
-    if (aiPressStartTime != 0 && (now - aiPressStartTime >= LONG_PRESS_MS)) {
-      // 5 saniye geçti - pairing mode'u başlat
-      Serial.println("[DEBUG] AI butonu 5 saniye basılı tutuldu - Pairing mode başlatılıyor");
-      eventTransport.enablePairingMode();
-      aiPressStartTime = 0; // Tekrar tetiklenmesini önle
-      Serial.println("[DEBUG] Pairing mode başlatıldı");
     }
   } else if (aiState == HIGH && aiPressed) {
     // Buton bırakıldı
     aiPressed = false;
     uint32_t now = millis();
     lastAiReleaseTime = now;  // Bırakılma zamanını kaydet (bounce önleme için)
-    aiPressStartTime = 0;      // Basılı tutma zamanını sıfırla
-    // Event gönder: AI butonu bırakıldı (basılı tutma sona erdi)
+    // Event gönder: AI butonu bırakıldı (bas-konuş sona erdi)
     sendEvent(AI_RELEASE, mainIndex, subIndex);
   }
 

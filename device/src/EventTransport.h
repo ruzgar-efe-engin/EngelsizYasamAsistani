@@ -149,7 +149,7 @@ private:
   uint8_t _ledPin;
   bool _pairingModeActive = false;
   uint32_t _pairingModeStartTime = 0;
-  static const uint32_t PAIRING_MODE_DURATION_MS = 30000; // 30 saniye
+  static const uint32_t PAIRING_MODE_DURATION_MS = 15000; // 15 saniye
 };
 
 /* =========================================================
@@ -356,7 +356,7 @@ private:
   bool _oldDeviceConnected;
   bool _pairingModeActive = false;
   uint32_t _pairingModeStartTime = 0;
-  static const uint32_t PAIRING_MODE_DURATION_MS = 30000; // 30 saniye
+  static const uint32_t PAIRING_MODE_DURATION_MS = 15000; // 15 saniye
   
   // BLE Server Callbacks
   class MyServerCallbacks: public BLEServerCallbacks {
