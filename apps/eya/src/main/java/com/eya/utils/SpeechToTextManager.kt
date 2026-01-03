@@ -26,6 +26,10 @@ class SpeechToTextManager(private val context: Context) {
     private var maxAmplitude = 0
     private var amplitudeCheckCount = 0
     
+    // Kayıt başlangıç zamanı (minimum süre kontrolü için)
+    private var recordingStartTime: Long = 0
+    private val MIN_RECORDING_DURATION_MS = 500L // Minimum 500ms kayıt
+    
     fun startRecording(language: String = "tr-TR"): Boolean {
         if (isRecording) {
             return false
@@ -64,6 +68,7 @@ class SpeechToTextManager(private val context: Context) {
             isRecording = true
             maxAmplitude = 0
             amplitudeCheckCount = 0
+            recordingStartTime = System.currentTimeMillis()
             android.util.Log.d("STT", "Kayıt başladı - mikrofon testi aktif")
             return true
         } catch (e: Exception) {
@@ -75,11 +80,23 @@ class SpeechToTextManager(private val context: Context) {
     
     suspend fun stopRecordingAndTranscribe(language: String = "tr-TR"): String? {
         if (!isRecording || mediaRecorder == null) {
+            android.util.Log.w("STT", "Kayıt durmuyor çünkü kayıt aktif değil")
             return null
         }
         
         return withContext(Dispatchers.IO) {
             try {
+                // Kayıt süresini kontrol et
+                val recordingDuration = System.currentTimeMillis() - recordingStartTime
+                
+                android.util.Log.d("STT", "Kayıt durduruluyor - süre: ${recordingDuration}ms")
+                
+                // Minimum kayıt süresi kontrolü
+                if (recordingDuration < MIN_RECORDING_DURATION_MS) {
+                    android.util.Log.w("STT", "Kayıt çok kısa: ${recordingDuration}ms (minimum ${MIN_RECORDING_DURATION_MS}ms)")
+                    // Yine de devam et, belki API anlayabilir
+                }
+                
                 mediaRecorder?.apply {
                     stop()
                     release()
@@ -87,13 +104,28 @@ class SpeechToTextManager(private val context: Context) {
                 mediaRecorder = null
                 isRecording = false
                 
-                val file = audioFile ?: return@withContext null
+                val file = audioFile ?: run {
+                    android.util.Log.e("STT", "Ses dosyası bulunamadı!")
+                    return@withContext null
+                }
+                
+                if (!file.exists() || file.length() == 0L) {
+                    android.util.Log.e("STT", "Ses dosyası yok veya boş! Boyut: ${file.length()} bytes")
+                    return@withContext null
+                }
                 
                 val audioBytes = file.readBytes()
+                android.util.Log.d("STT", "Ses dosyası okundu - boyut: ${audioBytes.size} bytes")
+                
+                if (audioBytes.size < 100) {
+                    android.util.Log.w("STT", "Ses dosyası çok kısa: ${audioBytes.size} bytes (minimum 100 bytes önerilir)")
+                }
+                
                 val base64Audio = Base64.encodeToString(audioBytes, Base64.NO_WRAP)
                 
                 transcribeAudio(base64Audio, language)
             } catch (e: Exception) {
+                android.util.Log.e("STT", "Kayıt durdurma hatası: ${e.message}")
                 e.printStackTrace()
                 null
             }
@@ -102,6 +134,12 @@ class SpeechToTextManager(private val context: Context) {
     
     private suspend fun transcribeAudio(base64Audio: String, languageCode: String): String? {
         if (apiKey.isEmpty()) {
+            android.util.Log.e("STT", "API key boş!")
+            return null
+        }
+        
+        if (base64Audio.isEmpty()) {
+            android.util.Log.e("STT", "Ses dosyası boş!")
             return null
         }
         
@@ -112,11 +150,15 @@ class SpeechToTextManager(private val context: Context) {
                         put("encoding", "AMR_NB")
                         put("sampleRateHertz", 8000)
                         put("languageCode", languageCode)
+                        put("enableAutomaticPunctuation", true)
+                        put("enableWordTimeOffsets", false)
                     })
                     put("audio", JSONObject().apply {
                         put("content", base64Audio)
                     })
                 }.toString()
+                
+                android.util.Log.d("STT", "API isteği gönderiliyor - ses boyutu: ${base64Audio.length} bytes, dil: $languageCode")
                 
                 val request = Request.Builder()
                     .url("https://speech.googleapis.com/v1/speech:recognize?key=$apiKey")
@@ -124,9 +166,12 @@ class SpeechToTextManager(private val context: Context) {
                     .build()
                 
                 val response = client.newCall(request).execute()
+                val responseBody = response.body?.string()
                 
-                if (response.isSuccessful) {
-                    val responseBody = response.body?.string() ?: return@withContext null
+                android.util.Log.d("STT", "API yanıt kodu: ${response.code}")
+                android.util.Log.d("STT", "API yanıt: $responseBody")
+                
+                if (response.isSuccessful && responseBody != null) {
                     val jsonResponse = JSONObject(responseBody)
                     val results = jsonResponse.optJSONArray("results")
                     
@@ -135,12 +180,28 @@ class SpeechToTextManager(private val context: Context) {
                         val alternatives = firstResult.optJSONArray("alternatives")
                         if (alternatives != null && alternatives.length() > 0) {
                             val firstAlternative = alternatives.getJSONObject(0)
-                            return@withContext firstAlternative.optString("transcript", "")
+                            val transcript = firstAlternative.optString("transcript", "").trim()
+                            val confidence = firstAlternative.optDouble("confidence", 0.0)
+                            
+                            android.util.Log.d("STT", "Transkript bulundu: '$transcript', güven: $confidence")
+                            
+                            if (transcript.isNotEmpty()) {
+                                return@withContext transcript
+                            } else {
+                                android.util.Log.w("STT", "Transkript boş ama alternatif var")
+                            }
+                        } else {
+                            android.util.Log.w("STT", "Alternatifler yok")
                         }
+                    } else {
+                        android.util.Log.w("STT", "Sonuçlar yok veya boş")
                     }
+                } else {
+                    android.util.Log.e("STT", "API hatası: ${response.code} - $responseBody")
                 }
                 null
             } catch (e: Exception) {
+                android.util.Log.e("STT", "Transkripsiyon hatası: ${e.message}")
                 e.printStackTrace()
                 null
             }

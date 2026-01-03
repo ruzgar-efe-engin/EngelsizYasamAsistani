@@ -805,13 +805,15 @@ private fun handleDeviceEvent(
                         onLog = onLog
                     )
                 } else {
+                    // Daha detaylı hata mesajı
                     val errorMsg = if (language == "tr") {
-                        "Ses anlaşılamadı, lütfen tekrar deneyin"
+                        "Ses anlaşılamadı. Daha yüksek sesle ve net konuşun, lütfen tekrar deneyin"
                     } else {
-                        "Could not understand speech, please try again"
+                        "Could not understand speech. Speak louder and clearer, please try again"
                     }
                     ttsManager.speak(errorMsg, language)
-                    onLog("AI_RELEASE -> STT başarısız veya boş")
+                    onLog("AI_RELEASE -> STT başarısız veya boş - Logcat'te detaylı logları kontrol edin")
+                    android.util.Log.e("STT", "STT başarısız - API key kontrol edin, ses dosyası boyutunu kontrol edin")
                 }
             }
         }
