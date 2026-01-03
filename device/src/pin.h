@@ -4,8 +4,9 @@
 // BOARD SELECTION
 // ===============================
 // Board seçimi platformio.ini'deki build_flags ile yapılıyor
-// #define BOARD_XIAO      -> seeed_xiao_esp32s3 environment için
-// #define BOARD_S3_ZERO   -> esp32-s3-zero environment için
+// Manuel #define yapmayın! PlatformIO build_flags otomatik olarak tanımlar:
+// -DBOARD_XIAO      -> seeed_xiao_esp32s3 environment için
+// -DBOARD_S3_ZERO   -> esp32-s3-zero environment için
 
 // ===============================
 //  BOARD_WOKWI_XIAO_ESP32-S3 PIN MAP
@@ -35,6 +36,4 @@
 
   #define PIN_AI        9
   #define PIN_LED       10
-  #define PIN_MAIN_SW   11
-  #define PIN_RED_BUTTON 12 
 #endif
