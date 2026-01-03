@@ -1,7 +1,9 @@
 package com.eya
 
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.os.Build
 import android.os.Bundle
@@ -24,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -37,6 +40,8 @@ import kotlinx.coroutines.launch
 import android.content.pm.PackageManager
 
 class MainActivity : ComponentActivity() {
+    private var broadcastReceiver: BroadcastReceiver? = null
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
@@ -55,32 +60,53 @@ class MainActivity : ComponentActivity() {
             keyguardManager.requestDismissKeyguard(this, null)
         }
         
+        // BroadcastReceiver'ı kaydet
+        broadcastReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent?.action == "com.eya.BLE_EVENT") {
+                    val eventData = intent.getStringExtra("event_data") ?: return
+                    Log.d("MainActivity", "BroadcastReceiver'dan event alındı: $eventData")
+                    // Event'i AppScreen'e iletmek için bir callback kullanacağız
+                    // Şimdilik sadece log - AppScreen kendi BroadcastReceiver'ını kullanacak
+                }
+            }
+        }
+        
+        try {
+            val filter = IntentFilter("com.eya.BLE_EVENT")
+            registerReceiver(broadcastReceiver, filter)
+        } catch (e: Exception) {
+            Log.e("MainActivity", "BroadcastReceiver kayıt hatası: ${e.message}")
+        }
+        
         // BLE event'i intent'ten al (kilit ekranından geldiyse)
         val bleEvent = intent.getStringExtra("ble_event")
         if (bleEvent != null) {
-            Log.d("MainActivity", "BLE event intent'ten alındı: $bleEvent")
-            // Event'i işlemek için AppScreen'e ileteceğiz
+            Log.d("MainActivity", "BLE event intent'ten alındı (onCreate): $bleEvent")
+            // Broadcast gönder - AppScreen dinleyecek
+            val broadcastIntent = Intent("com.eya.BLE_EVENT").apply {
+                putExtra("event_data", bleEvent)
+            }
+            sendBroadcast(broadcastIntent)
         }
         
         setContent {
             AppScreen()
         }
-        
-        // BLE event'i işle (kilit ekranından geldiyse)
-        if (bleEvent != null) {
-            // Event'i işlemek için bir callback kullanacağız
-            // Şimdilik sadece log
-            Log.d("MainActivity", "BLE event işleniyor: $bleEvent")
-        }
     }
     
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
+        setIntent(intent) // Yeni intent'i set et
         // Yeni intent geldiğinde (kilit ekranından)
         val bleEvent = intent?.getStringExtra("ble_event")
         if (bleEvent != null) {
-            Log.d("MainActivity", "Yeni BLE event alındı: $bleEvent")
-            // Event'i işle
+            Log.d("MainActivity", "Yeni BLE event alındı (kilit ekranından): $bleEvent")
+            // Broadcast gönder - AppScreen dinleyecek
+            val broadcastIntent = Intent("com.eya.BLE_EVENT").apply {
+                putExtra("event_data", bleEvent)
+            }
+            sendBroadcast(broadcastIntent)
         }
     }
     
@@ -90,6 +116,18 @@ class MainActivity : ComponentActivity() {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
             val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as android.app.KeyguardManager
             keyguardManager.requestDismissKeyguard(this, null)
+        }
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        // BroadcastReceiver'ı kaldır
+        try {
+            broadcastReceiver?.let {
+                unregisterReceiver(it)
+            }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "BroadcastReceiver kaldırma hatası: ${e.message}")
         }
     }
 }
@@ -250,6 +288,9 @@ fun AppScreen() {
         contract = ActivityResultContracts.RequestMultiplePermissions(),
         onResult = { Log.d("EYA", "Bluetooth izin sonucu: $it") }
     )
+
+    // Not: BroadcastReceiver Activity seviyesinde kaydedildi (MainActivity.onCreate)
+    // Kilit ekranından gelen event'ler zaten BLE callback'leri üzerinden işleniyor
 
     // BLE callback: gelen event, bağlantı ve log
     LaunchedEffect(Unit) {
@@ -695,14 +736,61 @@ private fun handleDeviceEvent(
                 ttsManager.speak(errorMsg, language)
                 onLog("AI_PRESS -> kayıt başlatılamadı")
             } else {
-                onLog("AI_PRESS -> kayıt başlıyor")
+                // Mikrofon testi - kayıt başladığında sesli geri bildirim
+                val startMsg = if (language == "tr") {
+                    "Dinliyorum"
+                } else {
+                    "Listening"
+                }
+                ttsManager.speak(startMsg, language)
+                onLog("AI_PRESS -> kayıt başlıyor - mikrofon testi aktif")
+                
+                // Kayıt sırasında ses seviyesini kontrol et (test için)
+                scope.launch {
+                    kotlinx.coroutines.delay(500) // 500ms sonra ilk kontrol
+                    var checkCount = 0
+                    while (sttManager.isRecording() && checkCount < 20) { // Max 20 kontrol (10 saniye)
+                        val amplitude = sttManager.getMaxAmplitude()
+                        if (amplitude > 0) {
+                            onLog("Mikrofon testi - ses seviyesi: $amplitude")
+                        }
+                        kotlinx.coroutines.delay(500) // Her 500ms'de bir kontrol
+                        checkCount++
+                    }
+                }
             }
         }
         EventType.AI_RELEASE -> {
             val languageCode = if (language == "tr") "tr-TR" else "en-US"
+            
+            // Mikrofon testi sonuçlarını al
+            val testResults = sttManager.getTestResults()
+            if (testResults != null) {
+                val (maxAmplitude, checkCount) = testResults
+                onLog("Mikrofon testi sonuçları - max ses seviyesi: $maxAmplitude, kontrol sayısı: $checkCount")
+                
+                // Ses seviyesi çok düşükse uyar
+                if (maxAmplitude < 100 && checkCount > 5) {
+                    val warningMsg = if (language == "tr") {
+                        "Mikrofon ses seviyesi düşük, daha yakın konuşun"
+                    } else {
+                        "Microphone level is low, speak closer"
+                    }
+                    android.util.Log.w("STT", warningMsg)
+                }
+            }
+            
             scope.launch {
+                val stopMsg = if (language == "tr") {
+                    "İşleniyor"
+                } else {
+                    "Processing"
+                }
+                ttsManager.speak(stopMsg, language)
+                
                 val transcribedText = sttManager.stopRecordingAndTranscribe(languageCode)
                 if (transcribedText != null && transcribedText.isNotEmpty() && transcribedText.isNotBlank()) {
+                    onLog("AI_RELEASE -> STT başarılı: '$transcribedText'")
                     handleAIPressRelease(
                         transcribedText = transcribedText.trim(),
                         mainIndex = currentMainIndex,

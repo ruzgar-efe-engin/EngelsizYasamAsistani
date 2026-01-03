@@ -22,6 +22,10 @@ class SpeechToTextManager(private val context: Context) {
     private val client = OkHttpClient()
     private val apiKey = BuildConfig.API_KEY
     
+    // Mikrofon testi için ses seviyesi kontrolü
+    private var maxAmplitude = 0
+    private var amplitudeCheckCount = 0
+    
     fun startRecording(language: String = "tr-TR"): Boolean {
         if (isRecording) {
             return false
@@ -58,7 +62,9 @@ class SpeechToTextManager(private val context: Context) {
             }
             
             isRecording = true
-            android.util.Log.d("STT", "Kayıt başladı")
+            maxAmplitude = 0
+            amplitudeCheckCount = 0
+            android.util.Log.d("STT", "Kayıt başladı - mikrofon testi aktif")
             return true
         } catch (e: Exception) {
             android.util.Log.e("STT", "Kayıt başlatma hatası: ${e.message}")
@@ -142,6 +148,41 @@ class SpeechToTextManager(private val context: Context) {
     }
     
     fun isRecording(): Boolean = isRecording
+    
+    /**
+     * Mikrofon testi - kayıt sırasında ses seviyesini kontrol et
+     * @return Ses seviyesi (0-32767 arası) veya -1 eğer kayıt yoksa
+     */
+    fun getMaxAmplitude(): Int {
+        return if (isRecording && mediaRecorder != null) {
+            try {
+                val amplitude = mediaRecorder!!.maxAmplitude
+                if (amplitude > maxAmplitude) {
+                    maxAmplitude = amplitude
+                }
+                amplitudeCheckCount++
+                android.util.Log.d("STT", "Mikrofon testi - ses seviyesi: $amplitude, max: $maxAmplitude, kontrol sayısı: $amplitudeCheckCount")
+                amplitude
+            } catch (e: Exception) {
+                android.util.Log.e("STT", "Ses seviyesi okuma hatası: ${e.message}")
+                -1
+            }
+        } else {
+            -1
+        }
+    }
+    
+    /**
+     * Mikrofon testi sonuçlarını al
+     * @return Pair(maxAmplitude, checkCount) veya null eğer test yapılmadıysa
+     */
+    fun getTestResults(): Pair<Int, Int>? {
+        return if (amplitudeCheckCount > 0) {
+            Pair(maxAmplitude, amplitudeCheckCount)
+        } else {
+            null
+        }
+    }
     
     fun cancelRecording() {
         if (isRecording) {
