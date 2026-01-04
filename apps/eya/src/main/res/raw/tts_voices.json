@@ -1,0 +1,11 @@
+{
+  "voices": [
+    { "id": "tr-TR", "name": "Türkçe (Varsayılan)", "language": "tr-TR", "provider": "android", "gender": "neutral" },
+    { "id": "tr-TR-female", "name": "Türkçe (Kadın)", "language": "tr-TR", "provider": "android", "gender": "female" },
+    { "id": "tr-TR-male", "name": "Türkçe (Erkek)", "language": "tr-TR", "provider": "android", "gender": "male" },
+    { "id": "en-US", "name": "English (Default)", "language": "en-US", "provider": "android", "gender": "neutral" },
+    { "id": "en-US-female", "name": "English (Female)", "language": "en-US", "provider": "android", "gender": "female" },
+    { "id": "en-US-male", "name": "English (Male)", "language": "en-US", "provider": "android", "gender": "male" }
+  ],
+  "defaultVoiceId": "tr-TR"
+}

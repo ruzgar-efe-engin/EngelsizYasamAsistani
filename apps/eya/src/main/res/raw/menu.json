@@ -1,0 +1,116 @@
+{
+  "mainMenus": [
+    {
+      "id": 0,
+      "name": { "tr": "Zaman", "en": "Time" },
+      "subMenus": [
+        { "id": 0, "name": { "tr": "Saat", "en": "Time" } },
+        { "id": 1, "name": { "tr": "Tarih", "en": "Date" } }
+      ]
+    },
+    {
+      "id": 1,
+      "name": { "tr": "Hava Durumu", "en": "Weather" },
+      "subMenus": [
+        { "id": 0, "name": { "tr": "Bugün", "en": "Today" } },
+        { "id": 1, "name": { "tr": "Yarın", "en": "Tomorrow" } },
+        { "id": 2, "name": { "tr": "Bu Hafta", "en": "This Week" } },
+        { "id": 3, "name": { "tr": "Önümüzdeki Hafta", "en": "Next Week" } }
+      ]
+    },
+    {
+      "id": 2,
+      "name": { "tr": "Konum", "en": "Location" },
+      "subMenus": [
+        { "id": 0, "name": { "tr": "Mevcut Konum", "en": "Current Location" } },
+        { "id": 1, "name": { "tr": "Hangi Yöne Bakıyorum", "en": "Which Way Am I Facing" } },
+        { "id": 2, "name": { "tr": "Çevremde Ne Var", "en": "What Is Around Me" } }
+      ]
+    },
+    {
+      "id": 3,
+      "name": { "tr": "İletişim", "en": "Communication" },
+      "subMenus": [
+        { "id": 0, "name": { "tr": "112’yi Ara", "en": "Call 112" } },
+        { "id": 1, "name": { "tr": "Son Arayanı Ara", "en": "Call Last Caller" } },
+        { "id": 2, "name": { "tr": "Bas-Konuş Rehberden İsim Söyleyerek Ara", "en": "Push-to-Talk: Call by Name" } },
+        { "id": 3, "name": { "tr": "Bas-Konuş Numara Söyleyerek Ara", "en": "Push-to-Talk: Call by Number" } }
+      ]
+    },
+    {
+      "id": 4,
+      "name": { "tr": "Alarm", "en": "Alarm" },
+      "subMenus": [
+        { "id": 0, "name": { "tr": "Alarm Kur (Bas-Konuş)", "en": "Set Alarm (Push-to-Talk)" } },
+        { "id": 1, "name": { "tr": "Alarmları Say", "en": "List Alarms" } },
+        { "id": 2, "name": { "tr": "Alarm İptal Et", "en": "Cancel Alarm" } }
+      ]
+    },
+    {
+      "id": 5,
+      "name": { "tr": "YouTube", "en": "YouTube" },
+      "subMenus": [
+        { "id": 0, "name": { "tr": "Bas-Konuş Ara ve Oynat", "en": "Push-to-Talk: Search and Play" } }
+      ]
+    },
+    {
+      "id": 6,
+      "name": { "tr": "YouTube Music", "en": "YouTube Music" },
+      "subMenus": [
+        { "id": 0, "name": { "tr": "Bas-Konuş Ara ve Oynat", "en": "Push-to-Talk: Search and Play" } },
+        { "id": 1, "name": { "tr": "Rasgele Rock Müzik", "en": "Random Rock Music" } },
+        { "id": 2, "name": { "tr": "Rasgele Klasik Müzik", "en": "Random Classical Music" } }
+      ]
+    },
+    {
+      "id": 7,
+      "name": { "tr": "Radyo", "en": "Radio" },
+      "subMenus": [
+        { "id": 0, "name": { "tr": "TRT FM", "en": "TRT FM" } },
+        { "id": 1, "name": { "tr": "Power FM", "en": "Power FM" } },
+        { "id": 2, "name": { "tr": "BBC Radio 1", "en": "BBC Radio 1" } },
+        { "id": 3, "name": { "tr": "NPR", "en": "NPR" } }
+      ]
+    },
+    {
+      "id": 8,
+      "name": { "tr": "Telefon Durumu", "en": "Phone Status" },
+      "subMenus": [
+        { "id": 0, "name": { "tr": "Şarj Kaç", "en": "Battery Level" } },
+        { "id": 1, "name": { "tr": "İnternet Var mı", "en": "Is Internet Available" } },
+        { "id": 2, "name": { "tr": "Sessizde mi", "en": "Is It Silent" } }
+      ]
+    },
+    {
+      "id": 9,
+      "name": { "tr": "Güvenlik", "en": "Security" },
+      "subMenus": [
+        { "id": 0, "name": { "tr": "Acil Konum Gönder", "en": "Send Emergency Location" } },
+        { "id": 1, "name": { "tr": "“Güvendeyim” Mesajı Gönder", "en": "Send \"I am safe\" Message" } },
+        { "id": 2, "name": { "tr": "Yardım Çağrısı Başlat", "en": "Start Help Call" } },
+        { "id": 3, "name": { "tr": "Sürekli Konum Paylaş", "en": "Share Location Continuously" } }
+      ]
+    },
+    {
+      "id": 10,
+      "name": { "tr": "Yapay Zeka", "en": "AI" },
+      "subMenus": [
+        { "id": 0, "name": { "tr": "Gemini ile Bas-Konuş", "en": "Push-to-Talk with Gemini" } },
+        { "id": 1, "name": { "tr": "ChatGPT ile Bas-Konuş", "en": "Push-to-Talk with ChatGPT" } }
+      ]
+    },
+    {
+      "id": 11,
+      "name": { "tr": "Seslendirme", "en": "Voiceover" },
+      "subMenus": [
+        { "id": 0, "name": { "tr": "Türkçe (Varsayılan)", "en": "Turkish (Default)" } },
+        { "id": 1, "name": { "tr": "Türkçe (Kadın)", "en": "Turkish (Female)" } },
+        { "id": 2, "name": { "tr": "Türkçe (Erkek)", "en": "Turkish (Male)" } },
+        { "id": 3, "name": { "tr": "English (Varsayılan)", "en": "English (Default)" } },
+        { "id": 4, "name": { "tr": "English (Kadın)", "en": "English (Female)" } },
+        { "id": 5, "name": { "tr": "English (Erkek)", "en": "English (Male)" } }
+      ]
+    }
+  ]
+}
+

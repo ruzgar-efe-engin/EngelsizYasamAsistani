@@ -1,0 +1,309 @@
+# ============================================
+# Ortak Git Ignore - EYA Projesi
+# ============================================
+
+# ============================================
+# Temp Klasörleri
+# ============================================
+tmp/
+**/tmp/
+*.tmp
+*.temp
+
+# ============================================
+# Android Projesi (apps/eya/)
+# ============================================
+
+# Build çıktıları
+apps/eya/build/
+apps/eya/**/build/
+*.apk
+*.ap_
+*.dex
+*.class
+
+# Gradle
+apps/eya/.gradle/
+apps/eya/gradle/
+apps/eya/gradlew
+apps/eya/gradlew.bat
+apps/eya/gradle-wrapper.jar
+!apps/eya/gradle/wrapper/gradle-wrapper.jar
+!apps/eya/gradle/wrapper/gradle-wrapper.properties
+
+# Local properties (kişisel ayarlar ve API key'ler)
+apps/eya/local.properties
+apps/eya/local.properties.*
+*.local.properties
+
+# Android Studio / IntelliJ IDEA
+apps/eya/.idea/
+apps/eya/*.iml
+apps/eya/**/*.iml
+apps/eya/.idea_modules/
+apps/eya/.idea/workspace.xml
+apps/eya/.idea/tasks.xml
+apps/eya/.idea/gradle.xml
+apps/eya/.idea/assetWizardSettings.xml
+apps/eya/.idea/dictionaries
+apps/eya/.idea/libraries
+apps/eya/.idea/caches
+apps/eya/.idea/modules.xml
+apps/eya/.idea/.name
+apps/eya/.idea/compiler.xml
+apps/eya/.idea/copyright/profiles_settings.xml
+apps/eya/.idea/encodings.xml
+apps/eya/.idea/misc.xml
+apps/eya/.idea/modules.xml
+apps/eya/.idea/scopes/scope_settings.xml
+apps/eya/.idea/vcs.xml
+apps/eya/.idea/jsLibraryMappings.xml
+apps/eya/.idea/datasources.xml
+apps/eya/.idea/dataSources.ids
+apps/eya/.idea/dataSources.local.xml
+apps/eya/.idea/sqlDataSources.xml
+apps/eya/.idea/dynamic.xml
+apps/eya/.idea/uiDesigner.xml
+apps/eya/.idea/jarRepositories.xml
+
+# Android Studio Navigation editor temp files
+apps/eya/.idea/navEditor/
+
+# Android Studio captures folder
+apps/eya/captures/
+
+# External native build folder generated in Android Studio 2.2 and later
+apps/eya/.externalNativeBuild
+apps/eya/.cxx/
+
+# Google Services (e.g. APIs or Firebase)
+apps/eya/google-services.json
+
+# Freeline
+apps/eya/freeline.py
+apps/eya/freeline/
+apps/eya/freeline_project_description.json
+
+# fastlane
+apps/eya/fastlane/report.xml
+apps/eya/fastlane/Preview.html
+apps/eya/fastlane/screenshots
+apps/eya/fastlane/test_output
+
+# Version control
+apps/eya/vcs.xml
+
+# lint
+apps/eya/lint-results*.xml
+apps/eya/output.json
+
+# Android Profiling
+apps/eya/*.hprof
+
+# ============================================
+# PlatformIO Projesi (device/)
+# ============================================
+
+# PlatformIO build klasörü
+device/.pio/
+device/**/.pio/
+device/.pioenvs/
+device/.piolibdeps/
+
+# Compiled Object files
+device/*.o
+device/*.a
+device/*.so
+device/*.elf
+device/*.bin
+device/*.hex
+
+# Preprocessor output
+device/*.i
+device/*.ii
+device/*.s
+
+# Assembly listings
+device/*.asm
+
+# Debug files
+device/*.dSYM/
+device/*.su
+device/*.idb
+device/*.pdb
+
+# PlatformIO test
+device/.pio/test/
+
+# ============================================
+# IDE ve Editör Dosyaları
+# ============================================
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# Eclipse
+.project
+.classpath
+.cproject
+.settings/
+
+# NetBeans
+nbproject/
+nbbuild/
+dist/
+nbdist/
+.nb-gradle/
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# ============================================
+# İşletim Sistemi Dosyaları
+# ============================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ============================================
+# Log Dosyaları
+# ============================================
+*.log
+*.log.*
+logs/
+**/logs/
+
+# ============================================
+# Backup ve Geçici Dosyalar
+# ============================================
+*.bak
+*.backup
+*.old
+*.orig
+*.save
+*.swp
+*.swo
+*~
+
+# ============================================
+# API Keys, Secrets ve Hassas Bilgiler
+# ============================================
+
+# Environment dosyaları
+.env
+.env.*
+!.env.example
+*.env
+*.env.local
+*.env.*.local
+
+# API Key ve Secret dosyaları
+*api*key*
+*apikey*
+*secret*
+*credential*
+*password*
+*token*
+*auth*
+*.key
+*.pem
+*.p12
+*.jks
+*.keystore
+*.pfx
+*.cer
+*.crt
+*.cert
+
+# Secrets ve credentials klasörleri
+secrets/
+credentials/
+**/secrets/
+**/credentials/
+*.secrets
+*.credentials
+
+# Autopilot config (token içeriyor)
+.autopilot.json
+.autopilot.local.json
+
+# Kişisel config dosyaları
+*config.local*
+*config.personal*
+*.local.config
+
+# Google Services (Firebase, Maps, vb.)
+**/google-services.json
+**/google-services.json.bak
+**/GoogleService-Info.plist
+
+# Android signing keys
+*.jks
+*.keystore
+*.keystore.properties
+signing.properties
+release.properties
+
+# OAuth ve API credentials
+oauth_credentials.json
+api_credentials.json
+service_account.json
+*-credentials.json
+*-secrets.json
+
+# PlatformIO secrets
+device/secrets.json
+device/secrets.h
+device/credentials.h
+
+# ============================================
+# NOT: ProjeTanıtımı.mp4 ignore edilmeyecek
+# Bu dosya remote'a gidecek
+# ============================================
+

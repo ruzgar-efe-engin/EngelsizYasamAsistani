@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "author": "Türenç Engin",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-xiao-esp32-s3", "id": "ESP", "top": 77.37, "left": -101.42, "attrs": {} },
+    { "type": "wokwi-ky-040", "id": "MainMenu", "top": 145.7, "left": -432.8, "attrs": {} },
+    { "type": "wokwi-ky-040", "id": "SubMenu", "top": 241.7, "left": -308, "attrs": {} },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "AI",
+      "top": -39,
+      "left": -198.6,
+      "rotate": 90,
+      "attrs": { "color": "black", "xray": "1" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "infoled",
+      "top": 25.2,
+      "left": 109.4,
+      "attrs": { "color": "red", "flip": "" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r1",
+      "top": 119.15,
+      "left": 48,
+      "attrs": { "value": "1000" }
+    }
+  ],
+  "connections": [
+    [ "MainMenu:GND", "ESP:GND", "black", [ "h307.2", "v-85.6" ] ],
+    [ "SubMenu:GND", "ESP:GND", "black", [ "h172.8", "v-181.6" ] ],
+    [ "ESP:D2", "MainMenu:CLK", "green", [ "h-211.2", "v38.4" ] ],
+    [ "ESP:D3", "MainMenu:DT", "blue", [ "h-201.6", "v38.3" ] ],
+    [ "ESP:D4", "SubMenu:CLK", "green", [ "h-48", "v115.2" ] ],
+    [ "ESP:D5", "SubMenu:DT", "blue", [ "h-57.6", "v115.1" ] ],
+    [ "ESP:D6", "SubMenu:SW", "purple", [ "h-67.2", "v115.2", "h-28.8" ] ],
+    [ "infoled:C", "ESP:GND", "black", [ "v0" ] ],
+    [ "r1:2", "infoled:A", "green", [ "h27.6", "v-57.6" ] ],
+    [ "r1:1", "ESP:D10", "green", [ "v0" ] ],
+    [ "AI:1.r", "ESP:GND", "black", [ "h115.4", "v134.4" ] ],
+    [ "AI:2.r", "ESP:D9", "green", [ "v19.4", "h153.8", "v124.8" ] ]
+  ],
+  "dependencies": {}
+}
